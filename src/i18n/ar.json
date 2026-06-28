@@ -1,0 +1,177 @@
+{
+  "app": {
+    "name": "نيرو",
+    "tagline": "لم تعد غريباً أبداً"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "explore": "استكشف",
+    "services": "خدمات",
+    "community": "المجتمع",
+    "profile": "الملف الشخصي"
+  },
+  "home": {
+    "greeting": "مرحباً",
+    "subtitle": "دليلك للاستقرار",
+    "quickActions": "إجراءات سريعة",
+    "aiAssistant": "المساعد الذكي",
+    "safetyTips": "نصائح السلامة",
+    "jobs": "وظائف",
+    "exploreCategories": "تصفح الأقسام",
+    "featuredPlaces": "أماكن مميزة",
+    "latestCommunity": "آخر المنشورات",
+    "seeAll": "عرض الكل",
+    "welcomeBack": "مرحباً بعودتك!"
+  },
+  "explore": {
+    "title": "استكشف",
+    "searchPlaceholder": "ابحث عن أماكن، خدمات...",
+    "nearby": "القريبة",
+    "popular": "الشائعة",
+    "categories": "الأقسام",
+    "filters": "تصفية",
+    "sortBy": "ترتيب حسب",
+    "noResults": "لم يتم العثور على أماكن",
+    "distance": "كم"
+  },
+  "services": {
+    "title": "خدمات",
+    "subtitle": "مساعدة ميسرة عندما تحتاجها",
+  "places": {
+    "reviews": "تقييم",
+    "description": "الوصف",
+    "hours": "ساعات العمل",
+    "contact": "اتصال",
+    "call": "اتصال",
+    "directions": "الاتجاهات"
+  },
+  "categories": {
+      "legal": "مساعدة قانونية",
+      "translation": "ترجمة",
+      "housing": "سكن",
+      "healthcare": "رعاية صحية",
+      "education": "تعليم",
+      "transport": "مواصلات",
+      "banking": "بنوك",
+      "food": "مساعدة غذائية"
+    },
+    "contact": "اتصل",
+    "viewDetails": "عرض التفاصيل",
+    "price": "السعر",
+    "free": "مجاني",
+    "location": "الموقع",
+    "description": "الوصف",
+    "hours": "ساعات العمل",
+    "call": "اتصال",
+    "directions": "الاتجاهات"
+  },
+  "jobs": {
+    "title": "وظائف وفرص",
+    "subtitle": "ابحث عن عمل يناسب رحلتك",
+    "fullTime": "دوام كامل",
+    "partTime": "دوام جزئي",
+    "freelance": "عمل حر",
+    "internship": "تدريب",
+    "volunteer": "تطوع",
+    "saveJob": "حفظ الوظيفة",
+    "apply": "تقدم الآن",
+    "postedDate": "نشرت",
+    "salary": "الراتب",
+    "description": "الوصف",
+    "requirements": "المتطلبات",
+    "noJobs": "لا توجد وظائف",
+    "tags": "الوسوم"
+  },
+  "community": {
+    "title": "المجتمع",
+    "subtitle": "تواصل، شارك، وساعد",
+    "writePost": "اكتب منشوراً...",
+    "shareExperience": "شارك تجربتك",
+    "askHelp": "اطلب المساعدة",
+    "reviews": "تقييمات",
+    "likes": "إعجاب",
+    "comments": "تعليقات",
+    "share": "مشاركة",
+    "post": "منشور",
+    "addComment": "اكتب تعليقاً...",
+    "noPosts": "لا توجد منشورات بعد!"
+  },
+  "safety": {
+    "title": "نصائح السلامة",
+    "subtitle": "كن على اطلاع وابق آمناً",
+    "emergency": "أرقام الطوارئ",
+    "emergencyCall": "اتصل بالطوارئ",
+    "emergencyNum": "طوارئ",
+    "tips": "نصائح السلامة",
+    "localLaws": "القوانين المحلية",
+    "healthTips": "نصائح صحية",
+    "transportTips": "نصائح المواصلات",
+    "scamAlert": "تحذير من الاحتيال",
+    "readMore": "اقرأ المزيد"
+  },
+  "ai": {
+    "title": "نيرو الذكي",
+    "subtitle": "اسألني عن أي شيء في منزلك الجديد",
+    "placeholder": "اسألني عن أي شيء...",
+    "greeting": "مرحباً! أنا نيرو الذكي. يمكنني مساعدتك في المعلومات المحلية والترجمة والمستندات والمزيد. كيف يمكنني المساعدة؟",
+    "thinking": "جارٍ التفكير...",
+    "error": "عذراً، لم أتمكن من معالجة طلبك. حاول مرة أخرى.",
+    "clearChat": "مسح المحادثة",
+    "examples": [
+      "كيف أقدم على الإقامة؟",
+      "ابحث عن سكن مناسب بالقرب مني",
+      "ترجم هذا إلى الإنجليزية",
+      "ما هي المستندات المطلوبة للعمل؟"
+    ]
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "guest": "مستخدم ضيف",
+    "editProfile": "تعديل الملف",
+    "settings": "الإعدادات",
+    "language": "اللغة",
+    "notifications": "الإشعارات",
+    "savedItems": "العناصر المحفوظة",
+    "savedJobs": "الوظائف المحفوظة",
+    "about": "عن نيرو",
+    "shareApp": "مشاركة التطبيق",
+    "rateApp": "تقييم التطبيق",
+    "privacy": "سياسة الخصوصية",
+    "terms": "شروط الخدمة",
+    "logout": "تسجيل الخروج",
+    "version": "الإصدار"
+  },
+  "language": {
+    "title": "اختر اللغة",
+    "en": "English",
+    "ar": "العربية",
+    "fr": "Français",
+    "hu": "Magyar"
+  },
+  "common": {
+    "loading": "جارٍ التحميل...",
+    "error": "حدث خطأ ما",
+    "retry": "إعادة المحاولة",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "delete": "حذف",
+    "search": "بحث",
+    "back": "رجوع",
+    "next": "التالي",
+    "done": "تم",
+    "noData": "لا توجد بيانات",
+    "offline": "أنت غير متصل"
+  },
+  "categories": {
+    "restaurants": "مطاعم ومقاهي",
+    "landmarks": "معالم وثقافة",
+    "healthcare": "رعاية صحية",
+    "education": "تعليم ودورات",
+    "shopping": "تسوق",
+    "transport": "مواصلات",
+    "housing": "سكن وإيجار",
+    "government": "خدمات حكومية",
+    "religious": "أماكن دينية",
+    "entertainment": "ترفيه"
+  }
+}

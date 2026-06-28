@@ -1,0 +1,16 @@
+{
+  "name": "@naero/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Naero backend foundation for auth, profiles, secure provider access, and platform APIs.",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "health": "node scripts/healthcheck.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

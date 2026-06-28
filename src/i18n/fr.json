@@ -1,0 +1,177 @@
+{
+  "app": {
+    "name": "Naero",
+    "tagline": "Vous n'êtes plus un étranger"
+  },
+  "nav": {
+    "home": "Accueil",
+    "explore": "Explorer",
+    "services": "Services",
+    "community": "Communauté",
+    "profile": "Profil"
+  },
+  "home": {
+    "greeting": "Bonjour",
+    "subtitle": "Votre guide pour vous installer",
+    "quickActions": "Actions rapides",
+    "aiAssistant": "Assistant IA",
+    "safetyTips": "Conseils de sécurité",
+    "jobs": "Emplois",
+    "exploreCategories": "Explorer les catégories",
+    "featuredPlaces": "Lieux en vedette",
+    "latestCommunity": "Dernières publications",
+    "seeAll": "Voir tout",
+    "welcomeBack": "Bon retour !"
+  },
+  "explore": {
+    "title": "Explorer",
+    "searchPlaceholder": "Rechercher lieux, services...",
+    "nearby": "À proximité",
+    "popular": "Populaire",
+    "categories": "Catégories",
+    "filters": "Filtres",
+    "sortBy": "Trier par",
+    "noResults": "Aucun lieu trouvé",
+    "distance": "km"
+  },
+  "services": {
+    "title": "Services",
+    "subtitle": "Aide abordable quand vous en avez besoin",
+  "places": {
+    "reviews": "avis",
+    "description": "Description",
+    "hours": "Horaires",
+    "contact": "Contact",
+    "call": "Appeler",
+    "directions": "Itinéraire"
+  },
+  "categories": {
+      "legal": "Aide juridique",
+      "translation": "Traduction",
+      "housing": "Logement",
+      "healthcare": "Santé",
+      "education": "Éducation",
+      "transport": "Transport",
+      "banking": "Banque",
+      "food": "Aide alimentaire"
+    },
+    "contact": "Contacter",
+    "viewDetails": "Voir détails",
+    "price": "Prix",
+    "free": "Gratuit",
+    "location": "Emplacement",
+    "description": "Description",
+    "hours": "Horaires",
+    "call": "Appeler",
+    "directions": "Itinéraire"
+  },
+  "jobs": {
+    "title": "Emplois & Opportunités",
+    "subtitle": "Trouvez un travail adapté à votre parcours",
+    "fullTime": "Temps plein",
+    "partTime": "Temps partiel",
+    "freelance": "Freelance",
+    "internship": "Stage",
+    "volunteer": "Bénévolat",
+    "saveJob": "Sauvegarder",
+    "apply": "Postuler",
+    "postedDate": "Publié",
+    "salary": "Salaire",
+    "description": "Description",
+    "requirements": "Prérequis",
+    "noJobs": "Aucun emploi trouvé",
+    "tags": "Tags"
+  },
+  "community": {
+    "title": "Communauté",
+    "subtitle": "Connectez-vous, partagez et entraidez-vous",
+    "writePost": "Écrire un post...",
+    "shareExperience": "Partagez votre expérience",
+    "askHelp": "Demander de l'aide",
+    "reviews": "Avis",
+    "likes": "j'aime",
+    "comments": "commentaires",
+    "share": "Partager",
+    "post": "Publication",
+    "addComment": "Écrire un commentaire...",
+    "noPosts": "Aucun post pour le moment !"
+  },
+  "safety": {
+    "title": "Sécurité & Conseils",
+    "subtitle": "Restez informé et en sécurité",
+    "emergency": "Numéros d'urgence",
+    "emergencyCall": "Appeler les urgences",
+    "emergencyNum": "Urgence",
+    "tips": "Conseils de sécurité",
+    "localLaws": "Lois locales",
+    "healthTips": "Conseils santé",
+    "transportTips": "Conseils transport",
+    "scamAlert": "Alerte arnaque",
+    "readMore": "Lire plus"
+  },
+  "ai": {
+    "title": "Naero IA",
+    "subtitle": "Demandez-moi tout sur votre nouveau chez-vous",
+    "placeholder": "Posez-moi une question...",
+    "greeting": "Bonjour ! Je suis Naero IA. Je peux vous aider avec des infos locales, des traductions, des documents et plus. Comment puis-je vous aider ?",
+    "thinking": "Je réfléchis...",
+    "error": "Désolé, je n'ai pas pu traiter cela. Veuillez réessayer.",
+    "clearChat": "Effacer la discussion",
+    "examples": [
+      "Comment faire une demande de résidence ?",
+      "Trouver un logement abordable près de chez moi",
+      "Traduire ceci en français",
+      "Quels documents sont nécessaires pour travailler ?"
+    ]
+  },
+  "profile": {
+    "title": "Profil",
+    "guest": "Utilisateur invité",
+    "editProfile": "Modifier le profil",
+    "settings": "Paramètres",
+    "language": "Langue",
+    "notifications": "Notifications",
+    "savedItems": "Éléments sauvegardés",
+    "savedJobs": "Emplois sauvegardés",
+    "about": "À propos de Naero",
+    "shareApp": "Partager l'app",
+    "rateApp": "Noter l'app",
+    "privacy": "Politique de confidentialité",
+    "terms": "Conditions d'utilisation",
+    "logout": "Déconnexion",
+    "version": "Version"
+  },
+  "language": {
+    "title": "Choisir la langue",
+    "en": "English",
+    "ar": "العربية",
+    "fr": "Français",
+    "hu": "Magyar"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "search": "Rechercher",
+    "back": "Retour",
+    "next": "Suivant",
+    "done": "Terminé",
+    "noData": "Aucune donnée",
+    "offline": "Vous êtes hors ligne"
+  },
+  "categories": {
+    "restaurants": "Restaurants & Cafés",
+    "landmarks": "Monuments & Culture",
+    "healthcare": "Santé",
+    "education": "Éducation & Cours",
+    "shopping": "Shopping",
+    "transport": "Transport",
+    "housing": "Logement & Location",
+    "government": "Services gouvernementaux",
+    "religious": "Lieux de culte",
+    "entertainment": "Divertissement"
+  }
+}

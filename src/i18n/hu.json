@@ -1,0 +1,177 @@
+{
+  "app": {
+    "name": "Naero",
+    "tagline": "Többé nem vagy idegen"
+  },
+  "nav": {
+    "home": "Főoldal",
+    "explore": "Felfedezés",
+    "services": "Szolgáltatások",
+    "community": "Közösség",
+    "profile": "Profil"
+  },
+  "home": {
+    "greeting": "Üdvözöllek",
+    "subtitle": "Az útmutatód a beilleszkedéshez",
+    "quickActions": "Gyors műveletek",
+    "aiAssistant": "AI Asszisztens",
+    "safetyTips": "Biztonsági tippek",
+    "jobs": "Állások",
+    "exploreCategories": "Kategóriák felfedezése",
+    "featuredPlaces": "Kiemelt helyek",
+    "latestCommunity": "Legújabb a közösségből",
+    "seeAll": "Összes megtekintése",
+    "welcomeBack": "Üdv újra itt!"
+  },
+  "explore": {
+    "title": "Felfedezés",
+    "searchPlaceholder": "Helyek, szolgáltatások keresése...",
+    "nearby": "Közelben",
+    "popular": "Népszerű",
+    "categories": "Kategóriák",
+    "filters": "Szűrők",
+    "sortBy": "Rendezés",
+    "noResults": "Nincs találat",
+    "distance": "km-re"
+  },
+  "services": {
+    "title": "Szolgáltatások",
+    "subtitle": "Megfizethető segítség, amikor szükséged van rá",
+  "places": {
+    "reviews": "vélemény",
+    "description": "Leírás",
+    "hours": "Nyitvatartás",
+    "contact": "Kapcsolat",
+    "call": "Hívás",
+    "directions": "Útvonal"
+  },
+  "categories": {
+      "legal": "Jogi segítségnyújtás",
+      "translation": "Fordítás",
+      "housing": "Lakhatás",
+      "healthcare": "Egészségügy",
+      "education": "Oktatás",
+      "transport": "Közlekedés",
+      "banking": "Bankügyek",
+      "food": "Élelmiszer segítség"
+    },
+    "contact": "Kapcsolat",
+    "viewDetails": "Részletek",
+    "price": "Ár",
+    "free": "Ingyenes",
+    "location": "Helyszín",
+    "description": "Leírás",
+    "hours": "Nyitvatartás",
+    "call": "Hívás",
+    "directions": "Útvonal"
+  },
+  "jobs": {
+    "title": "Állások & Lehetőségek",
+    "subtitle": "Találj munkát, ami illik az utazásodhoz",
+    "fullTime": "Teljes munkaidő",
+    "partTime": "Részmunkaidő",
+    "freelance": "Szabadúszó",
+    "internship": "Gyakornok",
+    "volunteer": "Önkéntes",
+    "saveJob": "Állás mentése",
+    "apply": "Jelentkezés",
+    "postedDate": "Közzétéve",
+    "salary": "Fizetés",
+    "description": "Leírás",
+    "requirements": "Követelmények",
+    "noJobs": "Nincs találat",
+    "tags": "Címkék"
+  },
+  "community": {
+    "title": "Közösség",
+    "subtitle": "Kapcsolódj, ossz meg és segíts másokon",
+    "writePost": "Írj egy bejegyzést...",
+    "shareExperience": "Oszd meg tapasztalataid",
+    "askHelp": "Kérj segítséget",
+    "reviews": "Vélemények",
+    "likes": "kedvelés",
+    "comments": "hozzászólás",
+    "share": "Megosztás",
+    "post": "Bejegyzés",
+    "addComment": "Írj hozzászólást...",
+    "noPosts": "Még nincsenek bejegyzések!"
+  },
+  "safety": {
+    "title": "Biztonság & Helyi tippek",
+    "subtitle": "Légy tájékozott és maradj biztonságban",
+    "emergency": "Segélyhívó számok",
+    "emergencyCall": "Segélyhívás",
+    "emergencyNum": "Segélyhívás",
+    "tips": "Biztonsági tippek",
+    "localLaws": "Helyi törvények",
+    "healthTips": "Egészségügyi tippek",
+    "transportTips": "Közlekedési tippek",
+    "scamAlert": "Átverés figyelmeztetés",
+    "readMore": "Bővebben"
+  },
+  "ai": {
+    "title": "Naero AI",
+    "subtitle": "Kérdezz bármit az új otthonodról",
+    "placeholder": "Kérdezz bármit...",
+    "greeting": "Szia! Naero AI vagyok. Segítek helyi információkkal, fordításokkal, dokumentumokkal és többel. Hogyan segíthetek?",
+    "thinking": "Gondolkodom...",
+    "error": "Sajnálom, nem tudtam feldolgozni. Kérlek próbáld újra.",
+    "clearChat": "Csevegés törlése",
+    "examples": [
+      "Hogyan kérelmezzem a tartózkodási engedélyt?",
+      "Keress megfizethető lakhatást a közelben",
+      "Fordítsd le ezt magyarra",
+      "Milyen dokumentumok kellenek a munkához?"
+    ]
+  },
+  "profile": {
+    "title": "Profil",
+    "guest": "Vendég felhasználó",
+    "editProfile": "Profil szerkesztése",
+    "settings": "Beállítások",
+    "language": "Nyelv",
+    "notifications": "Értesítések",
+    "savedItems": "Mentett elemek",
+    "savedJobs": "Mentett állások",
+    "about": "A Naeróról",
+    "shareApp": "Alkalmazás megosztása",
+    "rateApp": "Alkalmazás értékelése",
+    "privacy": "Adatvédelmi irányelvek",
+    "terms": "Felhasználási feltételek",
+    "logout": "Kijelentkezés",
+    "version": "Verzió"
+  },
+  "language": {
+    "title": "Nyelv kiválasztása",
+    "en": "English",
+    "ar": "العربية",
+    "fr": "Français",
+    "hu": "Magyar"
+  },
+  "common": {
+    "loading": "Betöltés...",
+    "error": "Hiba történt",
+    "retry": "Újra",
+    "cancel": "Mégse",
+    "save": "Mentés",
+    "delete": "Törlés",
+    "search": "Keresés",
+    "back": "Vissza",
+    "next": "Tovább",
+    "done": "Kész",
+    "noData": "Nincs adat",
+    "offline": "Offline vagy"
+  },
+  "categories": {
+    "restaurants": "Éttermek & Kávézók",
+    "landmarks": "Nevezetességek & Kultúra",
+    "healthcare": "Egészségügy",
+    "education": "Oktatás & Tanfolyamok",
+    "shopping": "Vásárlás",
+    "transport": "Közlekedés",
+    "housing": "Lakhatás & Bérlés",
+    "government": "Kormányzati szolgáltatások",
+    "religious": "Vallási helyek",
+    "entertainment": "Szórakozás"
+  }
+}

@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: naero-backend-staging
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile.backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NAERO_SERVICE_ENV
+        value: staging
+      - key: PORT
+        value: 8787
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: MONITORING_WEBHOOK_URL
+        sync: false
+      - key: MONITORING_SAMPLE_RATE
+        value: 1

@@ -1,0 +1,177 @@
+{
+  "app": {
+    "name": "Naero",
+    "tagline": "You're never a stranger"
+  },
+  "nav": {
+    "home": "Home",
+    "explore": "Explore",
+    "services": "Services",
+    "community": "Community",
+    "profile": "Profile"
+  },
+  "home": {
+    "greeting": "Welcome",
+    "subtitle": "Your guide to settling in",
+    "quickActions": "Quick Actions",
+    "aiAssistant": "AI Assistant",
+    "safetyTips": "Safety Tips",
+    "jobs": "Jobs",
+    "exploreCategories": "Explore Categories",
+    "featuredPlaces": "Featured Places",
+    "latestCommunity": "Latest from Community",
+    "seeAll": "See All",
+    "welcomeBack": "Welcome back!"
+  },
+  "explore": {
+    "title": "Explore",
+    "searchPlaceholder": "Search places, services...",
+    "nearby": "Nearby",
+    "popular": "Popular",
+    "categories": "Categories",
+    "filters": "Filters",
+    "sortBy": "Sort by",
+    "noResults": "No places found",
+    "distance": "km away"
+  },
+  "services": {
+    "title": "Services",
+    "subtitle": "Affordable help when you need it",
+  "places": {
+    "reviews": "reviews",
+    "description": "Description",
+    "hours": "Hours",
+    "contact": "Contact",
+    "call": "Call",
+    "directions": "Directions"
+  },
+  "categories": {
+      "legal": "Legal Aid",
+      "translation": "Translation",
+      "housing": "Housing",
+      "healthcare": "Healthcare",
+      "education": "Education",
+      "transport": "Transport",
+      "banking": "Banking",
+      "food": "Food Assistance"
+    },
+    "contact": "Contact",
+    "viewDetails": "View Details",
+    "price": "Price",
+    "free": "Free",
+    "location": "Location",
+    "description": "Description",
+    "hours": "Hours",
+    "call": "Call",
+    "directions": "Directions"
+  },
+  "jobs": {
+    "title": "Jobs & Opportunities",
+    "subtitle": "Find work that fits your journey",
+    "fullTime": "Full-Time",
+    "partTime": "Part-Time",
+    "freelance": "Freelance",
+    "internship": "Internship",
+    "volunteer": "Volunteer",
+    "saveJob": "Save Job",
+    "apply": "Apply Now",
+    "postedDate": "Posted",
+    "salary": "Salary",
+    "description": "Description",
+    "requirements": "Requirements",
+    "noJobs": "No jobs found",
+    "tags": "Tags"
+  },
+  "community": {
+    "title": "Community",
+    "subtitle": "Connect, share, and help each other",
+    "writePost": "Write a post...",
+    "shareExperience": "Share your experience",
+    "askHelp": "Ask for help",
+    "reviews": "Reviews",
+    "likes": "likes",
+    "comments": "comments",
+    "share": "Share",
+    "post": "Post",
+    "addComment": "Write a comment...",
+    "noPosts": "No posts yet. Be the first!"
+  },
+  "safety": {
+    "title": "Safety & Local Tips",
+    "subtitle": "Stay informed and stay safe",
+    "emergency": "Emergency Numbers",
+    "emergencyCall": "Call Emergency",
+    "emergencyNum": "Emergency",
+    "tips": "Safety Tips",
+    "localLaws": "Local Laws",
+    "healthTips": "Health Tips",
+    "transportTips": "Transport Tips",
+    "scamAlert": "Scam Alert",
+    "readMore": "Read More"
+  },
+  "ai": {
+    "title": "Naero AI",
+    "subtitle": "Ask me anything about your new home",
+    "placeholder": "Ask me anything...",
+    "greeting": "Hi! I'm Naero AI. I can help you with local info, translations, documents, and more. How can I help?",
+    "thinking": "Thinking...",
+    "error": "Sorry, I couldn't process that. Please try again.",
+    "clearChat": "Clear Chat",
+    "examples": [
+      "How do I apply for residency?",
+      "Find affordable housing near me",
+      "Translate this to Arabic",
+      "What documents do I need for work?"
+    ]
+  },
+  "profile": {
+    "title": "Profile",
+    "guest": "Guest User",
+    "editProfile": "Edit Profile",
+    "settings": "Settings",
+    "language": "Language",
+    "notifications": "Notifications",
+    "savedItems": "Saved Items",
+    "savedJobs": "Saved Jobs",
+    "about": "About Naero",
+    "shareApp": "Share App",
+    "rateApp": "Rate App",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "logout": "Log Out",
+    "version": "Version"
+  },
+  "language": {
+    "title": "Choose Language",
+    "en": "English",
+    "ar": "العربية",
+    "fr": "Français",
+    "hu": "Magyar"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "search": "Search",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "noData": "No data available",
+    "offline": "You are offline"
+  },
+  "categories": {
+    "restaurants": "Restaurants & Cafes",
+    "landmarks": "Landmarks & Culture",
+    "healthcare": "Healthcare",
+    "education": "Education & Courses",
+    "shopping": "Shopping",
+    "transport": "Transport",
+    "housing": "Housing & Rentals",
+    "government": "Government Services",
+    "religious": "Religious Places",
+    "entertainment": "Entertainment"
+  }
+}

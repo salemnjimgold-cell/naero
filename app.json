@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Naero",
+    "slug": "naero-app",
+    "version": "1.1.3",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1d848be5-90a9-467d-a670-1841606fe59c"
+      }
+    },
+    "owner": "salemnjimgold"
+  }
+}
