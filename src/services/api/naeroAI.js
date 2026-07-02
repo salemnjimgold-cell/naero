@@ -1,4 +1,4 @@
-import { naeroApi } from './naeroApi';
+import { naeroApi } from './naeroApi.js';
 import { API_BASE_URL } from '../../config/api';
 
 export function createNaeroAI(apiClient = naeroApi) {
