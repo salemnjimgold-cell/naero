@@ -1,7 +1,12 @@
-import { naeroApi } from './naeroApi.js';
+import { apiClient } from '../apiClient';
 import { API_BASE_URL } from '../../config/api';
 
-export function createNaeroAI(apiClient = naeroApi) {
+const defaultNaeroApi = {
+  ...apiClient,
+  post: (path, body, options) => apiClient.request(path, { ...options, method: 'POST', body }),
+};
+
+export function createNaeroAI(apiClient = defaultNaeroApi) {
   let conversations = [];
   let currentConversationId = null;
 
