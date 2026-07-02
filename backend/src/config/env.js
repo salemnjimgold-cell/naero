@@ -50,7 +50,7 @@ function readEnv(source = process.env) {
       anonKey: mergedSource.SUPABASE_ANON_KEY || '',
       serviceRoleKey: mergedSource.SUPABASE_SERVICE_ROLE_KEY || '',
       jwtSecret: mergedSource.SUPABASE_JWT_SECRET || mergedSource.JWT_SECRET || '',
-      jwksUrl: mergedSource.SUPABASE_URL ? `${mergedSource.SUPABASE_URL}/.well-known/jwks.json` : '',
+      jwksUrl: mergedSource.SUPABASE_URL ? `${mergedSource.SUPABASE_URL}/auth/v1/.well-known/jwks.json` : '',
     },
     ai: {
       provider: mergedSource.AI_PROVIDER || 'openai',
