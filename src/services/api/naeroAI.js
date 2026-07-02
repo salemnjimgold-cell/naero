@@ -6,6 +6,34 @@ const defaultNaeroApi = {
   post: (path, body, options) => apiClient.request(path, { ...options, method: 'POST', body }),
 };
 
+function firstConversation(candidate) {
+  if (!candidate) return null;
+  if (Array.isArray(candidate)) return candidate.find(item => item?.id) || null;
+  if (candidate.id) return candidate;
+  return null;
+}
+
+function extractConversation(result) {
+  const candidates = [
+    result?.data,
+    result?.data?.conversation,
+    result?.data?.data,
+    result?.data?.data?.conversation,
+    result?.body,
+    result?.body?.data,
+    result?.body?.conversation,
+    result?.body?.data?.conversation,
+    result?.conversation,
+  ];
+
+  for (const candidate of candidates) {
+    const conversation = firstConversation(candidate);
+    if (conversation) return conversation;
+  }
+
+  return null;
+}
+
 export function createNaeroAI(apiClient = defaultNaeroApi) {
   let conversations = [];
   let currentConversationId = null;
@@ -25,10 +53,11 @@ export function createNaeroAI(apiClient = defaultNaeroApi) {
       title: 'Mobile Chat',
       topic: null,
     });
-    if (result.data?.id) {
-      currentConversationId = result.data.id;
-      conversations.push(result.data);
-      return { id: result.data.id, existing: false, _debug: debugReq('POST', '/v1/ai/conversations', result) };
+    const conversation = extractConversation(result);
+    if (conversation?.id) {
+      currentConversationId = conversation.id;
+      conversations.push(conversation);
+      return { id: conversation.id, existing: false, _debug: debugReq('POST', '/v1/ai/conversations', result) };
     }
     if (result.error) {
       return { error: result.error, status: result.status, _debug: debugReq('POST', '/v1/ai/conversations', result) };
