@@ -11,6 +11,7 @@ import {
   Dimensions,
   Image,
   Keyboard,
+  Switch,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,18 +19,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import { naeroAI, trackAIRequest, isAuthenticated as checkAuth } from '../services';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
 const { width } = Dimensions.get('window');
-
-const DAILY_TIPS = [
-  { icon: 'sunny-outline', text: 'Register for a tax ID online at ugyfelkapu.hu - it unlocks everything.' },
-  { icon: 'bulb-outline', text: 'Always carry your residence permit. Police may ask for ID anytime.' },
-  { icon: 'happy-outline', text: 'Budapest has free walking tours every morning from Vorosmarty ter.' },
-  { icon: 'shield-checkmark-outline', text: 'Emergency number 112 works across all EU countries.' },
-  { icon: 'restaurant-outline', text: 'Try langos - fried dough with sour cream and cheese. A must!' },
-];
 
 const QUICK_ACTIONS = [
   { id: 'residency', icon: 'document-text-outline', label: 'Residency', color: COLORS.primary },
@@ -44,41 +38,31 @@ const QUICK_ACTIONS = [
 
 export default function AIScreen({ navigation }) {
   const { t, i18n } = useTranslation();
-  const { getAIEngine, refreshAIProfile, language, userLocation, userCity, hasLocationPermission } = useApp();
+  const { getAIEngine, refreshAIProfile, language, userLocation, userCity, hasLocationPermission, isAuthenticated } = useApp();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [aiReady, setAiReady] = useState(false);
-  const [tipIndex, setTipIndex] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showDebug, setShowDebug] = useState(false);
-  const [debugInfo, setDebugInfo] = useState({ source: '', gemini: false, model: 'gemini-2.0-flash' });
+  const [debugInfo, setDebugInfo] = useState({ source: '', provider: '', model: 'gpt-4o', ragEnabled: false, method: '', url: '', statusCode: '', responseBody: '' });
+  const [ragEnabled, setRagEnabled] = useState(false);
   const flatListRef = useRef(null);
   const thinkingDots = useRef(new Animated.Value(0)).current;
   const scrollTimeout = useRef(null);
-
-  const initChat = useCallback(async () => {
-    const engine = getAIEngine();
-    if (!engine.isReady()) await engine.init();
-    engine.setLocation(userLocation, userCity);
-    setAiReady(true);
-    const geminiActive = engine.isGeminiActive ? engine.isGeminiActive() : false;
-    setDebugInfo((p) => ({ ...p, gemini: geminiActive }));
-    const greeting = await engine.processMessage('hello', language);
-    setDebugInfo((p) => ({ ...p, source: greeting.source || 'local', time: new Date().toLocaleTimeString() }));
-    setMessages([
-      { id: 'welcome', role: 'assistant', content: greeting.response },
-    ]);
-  }, [getAIEngine, language, userLocation, userCity]);
+  const conversationIdRef = useRef(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    initChat();
-  }, [initChat]);
+    if (!initialized.current) {
+      initialized.current = true;
+      initChat();
+    }
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTipIndex((prev) => (prev + 1) % DAILY_TIPS.length);
     }, 8000);
     return () => clearInterval(interval);
   }, []);
@@ -109,18 +93,32 @@ export default function AIScreen({ navigation }) {
     return () => loop.stop();
   }, [isThinking]);
 
+  const initChat = useCallback(async () => {
+    setAiReady(true);
+
+    if (!checkAuth()) {
+      setMessages([{ id: 'welcome', role: 'assistant', content: 'Welcome to Naero AI! Sign in to access the full AI experience with knowledge retrieval and tool calling.' }]);
+      return;
+    }
+
+    const conv = await naeroAI.ensureConversation();
+    if (conv) {
+      const dbg = conv._debug || {};
+      setDebugInfo((p) => ({ ...p, method: dbg.method, url: dbg.url, statusCode: dbg.status, responseBody: dbg.response ? JSON.stringify(dbg.response).slice(0, 300) : null, time: new Date().toLocaleTimeString() }));
+      if (conv.error) {
+        setDebugInfo((p) => ({ ...p, error: `Conversation init failed (${conv.status || '?'}): ${conv.error.message || conv.error}`, time: new Date().toLocaleTimeString() }));
+        return;
+      }
+      conversationIdRef.current = conv.id;
+    }
+    setMessages([{ id: 'welcome', role: 'assistant', content: 'Hi! I\'m Naero AI. How can I help you with your journey?' }]);
+  }, []);
+
   const scheduleScroll = useCallback(() => {
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 80);
-  }, []);
-
-  const scrollToEndImmediate = useCallback(() => {
-    flatListRef.current?.scrollToEnd({ animated: false });
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 50);
   }, []);
 
   const handleSend = useCallback(
@@ -134,28 +132,51 @@ export default function AIScreen({ navigation }) {
       setIsThinking(true);
       scheduleScroll();
 
-      const engine = getAIEngine();
-      engine.setLocation(userLocation, userCity);
-      const result = await engine.processMessage(msg, language);
-      refreshAIProfile();
+      trackAIRequest('gpt-4o', 'naero', QUICK_ACTIONS.find(a => msg.toLowerCase().includes(a.label.toLowerCase()))?.id);
 
-      setDebugInfo({
-        source: result.source || 'unknown',
-        gemini: engine.isGeminiActive ? engine.isGeminiActive() : false,
-        model: 'gemini-2.0-flash',
-        time: new Date().toLocaleTimeString(),
-      });
+      try {
+        const result = await naeroAI.sendMessage(msg, {
+          conversationId: conversationIdRef.current,
+          ragEnabled,
+          topic: QUICK_ACTIONS.find(a => msg.toLowerCase().includes(a.label.toLowerCase()))?.id || null,
+        });
 
-      const aiMsg = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: result.response,
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+        const dbg = result._debug || {};
+        setDebugInfo({
+          source: result.data ? 'backend' : 'error',
+          provider: result.ragMetrics ? 'naero-rag' : 'naero',
+          model: 'gpt-4o',
+          ragEnabled,
+          time: new Date().toLocaleTimeString(),
+          method: dbg.method,
+          url: dbg.url,
+          statusCode: dbg.status,
+          responseBody: dbg.response ? JSON.stringify(dbg.response).slice(0, 300) : null,
+          error: result.error ? `[${result.error.code || 'ERR'}] ${result.error.message || JSON.stringify(result.error)}` : null,
+        });
+
+        if (result.data) {
+          const content = result.data.message?.content || result.data.content || '';
+          const aiMsg = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content,
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+          conversationIdRef.current = result.conversationId;
+        } else {
+          const errMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: result.error?.message || 'Sorry, something went wrong. Try again.' };
+          setMessages((prev) => [...prev, errMsg]);
+        }
+      } catch (err) {
+        const errMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: 'Sorry, I couldn\'t reach the server. Please check your connection.' };
+        setMessages((prev) => [...prev, errMsg]);
+      }
+
       setIsThinking(false);
       scheduleScroll();
     },
-    [input, isThinking, aiReady, getAIEngine, refreshAIProfile, language, scheduleScroll, userLocation, userCity]
+    [input, isThinking, aiReady, scheduleScroll, ragEnabled]
   );
 
   const handleQuickAction = useCallback(
@@ -169,10 +190,11 @@ export default function AIScreen({ navigation }) {
   );
 
   const clearChat = useCallback(() => {
-    getAIEngine().reset();
-    setDebugInfo({ source: '', gemini: false, model: 'gemini-2.0-flash' });
+    setMessages([]);
+    conversationIdRef.current = null;
+    naeroAI.reset();
     initChat();
-  }, [getAIEngine, initChat]);
+  }, [initChat]);
 
   const showWelcome = messages.length <= 1 && !isThinking;
 
@@ -205,11 +227,6 @@ export default function AIScreen({ navigation }) {
 
   const renderWelcome = () => (
     <View style={styles.welcomeWrap}>
-      <View style={styles.tipBanner}>
-        <Ionicons name={DAILY_TIPS[tipIndex].icon} size={15} color={COLORS.warning} />
-        <Text style={styles.tipText}>{DAILY_TIPS[tipIndex].text}</Text>
-      </View>
-
       <View style={styles.mascotSection}>
         <Image source={LOGO} style={{ width: 96, height: 96 }} resizeMode="contain" />
       </View>
@@ -221,6 +238,18 @@ export default function AIScreen({ navigation }) {
         <Text style={styles.dividerText}>How can I help?</Text>
         <View style={styles.dividerLine} />
       </View>
+
+      {isAuthenticated && (
+        <View style={styles.ragToggleRow}>
+          <Text style={styles.ragToggleLabel}>Knowledge Search</Text>
+          <Switch
+            value={ragEnabled}
+            onValueChange={setRagEnabled}
+            trackColor={{ false: COLORS.cardBorder, true: COLORS.primary + '60' }}
+            thumbColor={ragEnabled ? COLORS.primary : COLORS.textTertiary}
+          />
+        </View>
+      )}
 
       <View style={styles.quickGrid}>
         {QUICK_ACTIONS.map((action) => (
@@ -262,7 +291,7 @@ export default function AIScreen({ navigation }) {
           </TouchableOpacity>
           <View style={styles.headerAvatar}>
             <Image source={LOGO} style={{ width: 28, height: 28 }} resizeMode="contain" />
-            <View style={[styles.onlineDot, { backgroundColor: debugInfo.gemini ? COLORS.success : COLORS.warning }]} />
+            <View style={[styles.onlineDot, { backgroundColor: COLORS.success }]} />
           </View>
           <TouchableOpacity
             style={{ flex: 1 }}
@@ -271,7 +300,7 @@ export default function AIScreen({ navigation }) {
           >
             <Text style={styles.headerTitle}>Naero AI</Text>
             <Text style={styles.headerSub}>
-              {isThinking ? 'Thinking...' : (debugInfo.gemini ? 'Gemini AI - Online' : 'AI Assistant')}
+              {isThinking ? 'Thinking...' : (isAuthenticated ? 'AI Assistant' : 'Guest Mode')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={clearChat} style={styles.headerBtn}>
@@ -291,7 +320,7 @@ export default function AIScreen({ navigation }) {
             : [styles.chatList, { paddingBottom: keyboardHeight > 0 ? keyboardHeight + SPACING.sm : SPACING.sm }]
         }
         onContentSizeChange={scheduleScroll}
-        onLayout={scrollToEndImmediate}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         ListHeaderComponent={showWelcome ? renderWelcome : null}
         ListFooterComponent={
           isThinking && !showWelcome ? (
@@ -356,10 +385,15 @@ export default function AIScreen({ navigation }) {
         <View style={styles.debugOverlay}>
           <Text style={styles.debugTitle}>Naero AI Debug</Text>
           <Text style={styles.debugText}>Source: {debugInfo.source || 'idle'}</Text>
-          <Text style={styles.debugText}>Gemini: {debugInfo.gemini ? 'ACTIVE' : 'FALLBACK'}</Text>
+          <Text style={styles.debugText}>Provider: {debugInfo.provider || '-'}</Text>
           <Text style={styles.debugText}>Model: {debugInfo.model}</Text>
+          <Text style={styles.debugText}>RAG: {debugInfo.ragEnabled ? 'ON' : 'OFF'}</Text>
           <Text style={styles.debugText}>Time: {debugInfo.time || '-'}</Text>
           <Text style={styles.debugText}>Messages: {messages.length}</Text>
+          {debugInfo.method && <Text style={styles.debugText}>Req: {debugInfo.method} {debugInfo.url}</Text>}
+          {debugInfo.statusCode && <Text style={styles.debugText}>Status: {debugInfo.statusCode}</Text>}
+          {debugInfo.responseBody && <Text style={[styles.debugText, { color: COLORS.warning }]}>Response: {debugInfo.responseBody}</Text>}
+          {debugInfo.error && <Text style={[styles.debugText, { color: COLORS.error }]}>Error: {debugInfo.error}</Text>}
           <TouchableOpacity
             onPress={() => setShowDebug(false)}
             style={styles.debugClose}
@@ -408,7 +442,6 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.success,
     borderWidth: 2,
     borderColor: COLORS.bg,
   },
@@ -430,24 +463,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.lg,
-  },
-  tipBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    gap: SPACING.sm,
-    marginBottom: SPACING.xl,
-    width: '100%',
-  },
-  tipText: {
-    ...FONTS.caption,
-    color: COLORS.textSecondary,
-    flex: 1,
   },
   mascotSection: {
     marginBottom: SPACING.md,
@@ -483,6 +498,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  ragToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    marginBottom: SPACING.md,
+    width: '100%',
+  },
+  ragToggleLabel: {
+    ...FONTS.body,
+    color: COLORS.textPrimary,
   },
 
   quickGrid: {

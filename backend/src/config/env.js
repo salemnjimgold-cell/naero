@@ -49,7 +49,15 @@ function readEnv(source = process.env) {
       url: mergedSource.SUPABASE_URL || '',
       anonKey: mergedSource.SUPABASE_ANON_KEY || '',
       serviceRoleKey: mergedSource.SUPABASE_SERVICE_ROLE_KEY || '',
-      jwtSecret: mergedSource.SUPABASE_JWT_SECRET || '',
+      jwtSecret: mergedSource.SUPABASE_JWT_SECRET || mergedSource.JWT_SECRET || '',
+      jwksUrl: mergedSource.SUPABASE_URL ? `${mergedSource.SUPABASE_URL}/.well-known/jwks.json` : '',
+    },
+    ai: {
+      provider: mergedSource.AI_PROVIDER || 'openai',
+      model: mergedSource.AI_MODEL || '',
+      openaiApiKey: mergedSource.OPENAI_API_KEY || '',
+      geminiApiKey: mergedSource.GEMINI_API_KEY || '',
+      anthropicApiKey: mergedSource.ANTHROPIC_API_KEY || '',
     },
   };
 }
@@ -67,11 +75,44 @@ function getPublicConfig(env = readEnv()) {
 }
 
 function getConfigStatus(env = readEnv()) {
+  const jwksConfigured = Boolean(env.supabase.jwksUrl);
+  const legacySecretConfigured = Boolean(env.supabase.jwtSecret);
   return {
     supabasePublicConfigured: Boolean(env.supabase.url && env.supabase.anonKey),
     supabaseAdminConfigured: Boolean(env.supabase.url && env.supabase.serviceRoleKey),
-    jwtVerificationConfigured: Boolean(env.supabase.jwtSecret),
+    jwtVerificationConfigured: jwksConfigured || legacySecretConfigured,
+    jwtVerificationMethod: jwksConfigured ? 'jwks' : (legacySecretConfigured ? 'hs256' : 'none'),
   };
+}
+
+const REQUIRED_PRODUCTION_VARS = [
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+];
+
+function validateEnv(env = readEnv()) {
+  const errors = [];
+  const isProduction = env.nodeEnv === 'production' || env.serviceEnv === 'production';
+
+  if (isProduction) {
+    for (const key of REQUIRED_PRODUCTION_VARS) {
+      const value = key === 'SUPABASE_URL' ? env.supabase.url
+        : key === 'SUPABASE_ANON_KEY' ? env.supabase.anonKey
+        : key === 'SUPABASE_SERVICE_ROLE_KEY' ? env.supabase.serviceRoleKey
+        : null;
+      if (!value) errors.push(`Missing required environment variable: ${key}`);
+    }
+
+    if (!env.publicBaseUrl) errors.push('Missing required environment variable: PUBLIC_BASE_URL');
+    if (!env.corsOrigins.length) errors.push('Missing required environment variable: CORS_ORIGINS');
+
+    if (!env.supabase.jwksUrl && !env.supabase.jwtSecret) {
+      errors.push('Missing JWT verification configuration: set either SUPABASE_URL (for JWKS) or SUPABASE_JWT_SECRET (legacy)');
+    }
+  }
+
+  return { valid: errors.length === 0, errors, isProduction };
 }
 
 module.exports = {
@@ -79,4 +120,5 @@ module.exports = {
   readEnv,
   getPublicConfig,
   getConfigStatus,
+  validateEnv,
 };

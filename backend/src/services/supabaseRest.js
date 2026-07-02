@@ -7,7 +7,8 @@ function createSupabaseRestClient(env, fetchImpl = fetch) {
       return { data: null, error: { code: 'SUPABASE_NOT_CONFIGURED', message: 'Supabase admin access is not configured.' } };
     }
 
-    const response = await fetchImpl(`${url}/rest/v1${path}`, {
+    const apiUrl = `${url}/rest/v1${path}`;
+    const response = await fetchImpl(apiUrl, {
       ...options,
       headers: {
         apikey: serviceRoleKey,
@@ -28,6 +29,7 @@ function createSupabaseRestClient(env, fetchImpl = fetch) {
 
   return {
     configured,
+    request,
     getProfile: (userId) => request(`/profiles?id=eq.${encodeURIComponent(userId)}&select=*`),
     upsertProfile: (userId, profile) => request('/profiles', {
       method: 'POST',
