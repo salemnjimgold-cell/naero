@@ -53,6 +53,7 @@ export function createNaeroAI(apiClient = defaultNaeroApi) {
       title: 'Mobile Chat',
       topic: null,
     });
+    console.log('[AI_DEBUG] create conversation raw response:', JSON.stringify(result, null, 2));
     const conversation = extractConversation(result);
     if (conversation?.id) {
       currentConversationId = conversation.id;
