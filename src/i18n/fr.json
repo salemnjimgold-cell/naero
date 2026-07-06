@@ -164,6 +164,13 @@
   },
   "categories": {
     "restaurants": "Restaurants & Cafés",
+    "cafés": "Cafés",
+    "halalFood": "Alimentation Halal",
+    "supermarkets": "Supermarchés",
+    "pharmacies": "Pharmacies",
+    "hospitals": "Hôpitaux",
+    "clinics": "Cliniques",
+    "banks": "Banques & Distributeurs",
     "landmarks": "Monuments & Culture",
     "healthcare": "Santé",
     "education": "Éducation & Cours",
@@ -172,6 +179,16 @@
     "housing": "Logement & Location",
     "government": "Services gouvernementaux",
     "religious": "Lieux de culte",
-    "entertainment": "Divertissement"
+    "entertainment": "Divertissement",
+    "immigration": "Immigration",
+    "languageSchools": "Écoles de langues",
+    "communityCenters": "Centres communautaires",
+    "tourist": "Info tourisme",
+    "legal": "Aide juridique",
+    "translation": "Traduction",
+    "refugee": "Aide aux réfugiés",
+    "ngo": "ONG & Associations",
+    "emergency": "Services d'urgence",
+    "jobSupport": "Aide à l'emploi"
   }
 }

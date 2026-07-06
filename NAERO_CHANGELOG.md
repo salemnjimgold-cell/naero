@@ -2,6 +2,21 @@
 
 All notable project-level technical changes should be recorded here.
 
+## 2026-06-29
+
+- Completed Sprint 3 Database Sprint 1: Core data tables and repository layer.
+- Added Migration 002 — places, reviews, reports, ai_conversations, ai_messages, saved_places with UUID PKs, foreign keys, proper indexes, and RLS.
+- Added six repository modules: placesRepository, reviewsRepository, reportsRepository, aiConversationsRepository, aiMessagesRepository, savedPlacesRepository.
+- Added seed data: 12 sample places across 6 categories in Budapest.
+- Updated MIGRATIONS.md with full table reference, index policy, and RLS summary.
+- Updated seeds README with seed policy and adding-new-seeds guide.
+- Updated repository index.js barrel export with createRepositories() factory.
+- Updated NAERO_MASTER_ROADMAP.md: Sprint 3 scope split into Infrastructure and Database sections; Sprint 4 dedicated to AI Platform.
+- Updated NAERO_SPRINT_3_PLAN.md: renamed and expanded to cover Database Sprint 1 with database design decisions, success criteria, and verification plan.
+- Updated NAERO_ARCHITECTURE.md: added migration 002, seed data, and repository layer references.
+- Updated NAERO_SECURITY.md: noted new RLS policies and data protection design.
+- AI Gateway remains explicitly unimplemented in Sprint 3.
+
 ## 2026-06-28
 
 - Completed Sprint 3 repository-side Backend Deployment & Infrastructure implementation.

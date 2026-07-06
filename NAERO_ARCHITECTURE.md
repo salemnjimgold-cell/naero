@@ -57,12 +57,16 @@ Current risk: `AppContext` is becoming too broad. Future work should split respo
 - `backend/src/services/supabaseRest.js`: backend-only Supabase REST access using service-role credentials from environment.
 - `backend/src/observability/`: structured logging, redaction, optional monitoring webhook events.
 - `backend/src/routes/`: health and profile route handlers.
-- `backend/db/migrations/001_core_auth_profiles.sql`: Supabase schema for profiles, user settings, consent events, and RLS policies.
+- `backend/db/migrations/001_core_auth_profiles.sql`: Supabase schema for profiles, user settings, consent events, and RLS policies (Sprint 2).
+- `backend/db/migrations/002_core_data_tables.sql`: Supabase schema for places, reviews, reports, ai_conversations, ai_messages, saved_places with indexes and RLS (Sprint 3 Database Sprint 1).
+- `backend/db/seeds/001_sample_places.sql`: Sample seed data for development/staging.
+- `backend/src/services/repositories/`: Repository layer with six typed modules — places, reviews, reports, ai_conversations, ai_messages, saved_places — each exposing CRUD and query methods via Supabase REST API.
+- `backend/src/services/supabaseRest.js`: Shared REST client used by all repositories.
 - `backend/docs/`: auth strategy and backend security model.
 - `scripts/backend-dev.ps1`, `scripts/backend-health.ps1`, `scripts/backend-smoke.ps1`: reproducible local backend workflow.
 - `Dockerfile.backend` and `deploy/render/render.yaml`: staging-first deployment scaffolding.
 
-Current limitation: repository-side deployment scaffolding exists, but actual hosting/Supabase/DNS/secrets must be configured with external account access.
+Current limitation: repository-side deployment scaffolding exists and database schema is fully defined, but actual hosting/Supabase/DNS/secrets must be configured with external account access for migrations to be applied.
 
 ### Location and Live Data
 

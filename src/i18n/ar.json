@@ -164,6 +164,13 @@
   },
   "categories": {
     "restaurants": "مطاعم ومقاهي",
+    "cafés": "مقاهي",
+    "halalFood": "طعام حلال",
+    "supermarkets": "سوبرماركت",
+    "pharmacies": "صيدليات",
+    "hospitals": "مستشفيات",
+    "clinics": "عيادات",
+    "banks": "بنوك وصيارف",
     "landmarks": "معالم وثقافة",
     "healthcare": "رعاية صحية",
     "education": "تعليم ودورات",
@@ -172,6 +179,16 @@
     "housing": "سكن وإيجار",
     "government": "خدمات حكومية",
     "religious": "أماكن دينية",
-    "entertainment": "ترفيه"
+    "entertainment": "ترفيه",
+    "immigration": "هجرة",
+    "languageSchools": "مدارس لغات",
+    "communityCenters": "مراكز مجتمعية",
+    "tourist": "معلومات سياحية",
+    "legal": "مساعدة قانونية",
+    "translation": "ترجمة",
+    "refugee": "دعم اللاجئين",
+    "ngo": "منظمات وجمعيات خيرية",
+    "emergency": "خدمات طوارئ",
+    "jobSupport": "دعم وظيفي"
   }
 }

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../theme';
 
 import SplashScreen from '../screens/SplashScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
+import WelcomeScreen from '../screens/WelcomeScreen';
 import AuthScreen from '../screens/AuthScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -26,6 +26,7 @@ import JobDetailScreen from '../screens/JobDetailScreen';
 import CommunityDetailScreen from '../screens/CommunityDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -98,9 +99,9 @@ export default function AppNavigator() {
           options={{ animation: 'fade' }}
         />
         <Stack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-          options={{ animation: 'slide_from_right' }}
+          name="Welcome"
+          component={WelcomeScreen}
+          options={{ animation: 'fade' }}
         />
         <Stack.Screen
           name="Auth"
@@ -160,6 +161,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="CommunityDetail"
           component={CommunityDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

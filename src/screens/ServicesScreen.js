@@ -223,7 +223,7 @@ export default function ServicesScreen({ navigation }) {
               <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
           ) : (
-            <EmptyState mascotSize={72} />
+            <EmptyState message={t('common.noData')} mascotSize={72} />
           )
         }
         renderItem={({ item, index }) => (

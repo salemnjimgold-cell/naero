@@ -41,9 +41,17 @@ Naero handles or may handle sensitive data: migration context, nationality/origi
    - safe structured logger redacts credentials, tokens, email, phone, and location-like fields
    - Supabase profile/settings/consent schema includes row-level security policies
 
-7. Remaining: backend is not deployed and Supabase credentials are not configured in a secret manager yet.
+7. Sprint 3 Database Sprint 1 data protection design was added:
+   - Migration 002 adds six new tables (places, reviews, reports, ai_conversations, ai_messages, saved_places) with RLS on every table.
+   - Public read tables (places, reviews) allow anyone to read but restrict writes to owners.
+   - Strict user isolation on ai_conversations, ai_messages, saved_places via auth.uid() checks.
+   - ai_messages are immutable after creation (no update/delete policies).
+   - Polymorphic reports table uses application-level access control.
+   - Seed data contains no PII — only public place information.
 
-8. Sprint 3 repository-side infrastructure hardening was added:
+8. Remaining: backend is not deployed and Supabase credentials are not configured in a secret manager yet.
+
+9. Sprint 3 repository-side infrastructure hardening was added:
    - local `.env` examples with no secret values
    - staging/production environment templates
    - Docker deployment artifact

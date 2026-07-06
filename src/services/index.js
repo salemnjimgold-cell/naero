@@ -7,11 +7,21 @@ export { communityService } from './communityService';
 export { safetyTipService, emergencyContactService } from './safetyService';
 export { searchService } from './searchService';
 export { apiClient, createApiClient, ApiError } from './apiClient';
+export { naeroApi, createNaeroApiClient, NaeroApiError } from './api/naeroApi';
+export { naeroAI, createNaeroAI } from './api/naeroAI';
+export { naeroNotifications, createNaeroNotifications } from './api/naeroNotifications';
+export { naeroRealtime, createNaeroRealtime } from './api/naeroRealtime';
 export {
   getAuthSession,
   signInAsGuest,
+  signInWithEmail,
+  createAccount,
+  signOut,
   getAuthToken,
   isAuthenticated,
+  requestPasswordReset,
+  onAuthStateChange,
+  updateProfile,
 } from './authService';
 export {
   getLocalProfile,
@@ -84,3 +94,32 @@ export {
   persistLastLocation,
   getLastLiveLocation,
 } from './realTimeService';
+
+export {
+  getSupabaseClient,
+  isSupabaseConfigured,
+  destroySupabaseClient,
+} from './supabase';
+
+export {
+  enqueueWrite,
+  getQueue,
+  processQueue,
+  clearQueue,
+  getQueueSize,
+} from './offlineQueue';
+
+export {
+  track,
+  flush,
+  trackScreenView,
+  trackAIRequest,
+  trackSearch,
+  trackPlaceOpen,
+  trackAuth,
+  trackError,
+  isAnalyticsEnabled,
+  setAnalyticsEnabled,
+  getCachedEvents,
+  clearEvents,
+} from './analyticsService';

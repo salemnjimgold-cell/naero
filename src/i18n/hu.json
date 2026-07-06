@@ -164,6 +164,13 @@
   },
   "categories": {
     "restaurants": "Éttermek & Kávézók",
+    "cafés": "Kávézók",
+    "halalFood": "Halal ételek",
+    "supermarkets": "Szupermarketek",
+    "pharmacies": "Gyógyszertárak",
+    "hospitals": "Kórházak",
+    "clinics": "Klinikák",
+    "banks": "Bankok & ATM-ek",
     "landmarks": "Nevezetességek & Kultúra",
     "healthcare": "Egészségügy",
     "education": "Oktatás & Tanfolyamok",
@@ -172,6 +179,16 @@
     "housing": "Lakhatás & Bérlés",
     "government": "Kormányzati szolgáltatások",
     "religious": "Vallási helyek",
-    "entertainment": "Szórakozás"
+    "entertainment": "Szórakozás",
+    "immigration": "Bevándorlás",
+    "languageSchools": "Nyelviskolák",
+    "communityCenters": "Közösségi központok",
+    "tourist": "Turisztikai info",
+    "legal": "Jogi segítség",
+    "translation": "Fordítás",
+    "refugee": "Menekült támogatás",
+    "ngo": "NGO-k & Jótékonyság",
+    "emergency": "Sürgősségi szolgáltatások",
+    "jobSupport": "Álláskeresési támogatás"
   }
 }

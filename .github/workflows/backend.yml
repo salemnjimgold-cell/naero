@@ -1,0 +1,61 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'backend/**'
+      - 'Dockerfile.backend'
+      - '.dockerignore'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'Dockerfile.backend'
+
+env:
+  DOCKER_IMAGE: naero-backend
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --prefix backend --omit=dev
+      - run: npx eslint backend/src/
+      - run: node backend/scripts/smoke.js
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -f Dockerfile.backend -t ${{ env.DOCKER_IMAGE }}:${{ github.sha }} .
+      - name: Verify image exists
+        run: docker images --filter "reference=${{ env.DOCKER_IMAGE }}:${{ github.sha }}"
+
+  # ── Deploy job (manual trigger or push to main/staging) ──────────
+  # Requires repository secrets configured:
+  #   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
+  #   DATABASE_URL, JWT_SECRET, DEPLOY_HOST, DEPLOY_TOKEN
+  #
+  # deploy:
+  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+  #   needs: [lint, docker-build]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Deploy to staging
+  #       run: |
+  #         echo "Deployment requires:"
+  #         echo "  1. Container registry push (docker push)"
+  #         echo "  2. SSH or API call to deployment host"
+  #         echo "  3. Health check verification"
+  #         echo ""
+  #         echo "Available secrets: SUPABASE_URL, SUPABASE_ANON_KEY"
+  #         echo "                   SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL"
+  #         echo "                   JWT_SECRET"

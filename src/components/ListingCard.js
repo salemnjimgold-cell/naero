@@ -1,7 +1,35 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
+
+const PLACEHOLDER_LOGO = require('../../assets/branding/naero-logo.png');
+
+function PlaceImage({ item }) {
+  if (item.image_url) {
+    return (
+      <Image
+        source={{ uri: item.image_url }}
+        style={styles.placeImage}
+        resizeMode="cover"
+      />
+    );
+  }
+  if (item.image) {
+    return (
+      <Image
+        source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+        style={styles.placeImage}
+        resizeMode="cover"
+      />
+    );
+  }
+  return (
+    <View style={[styles.imagePlaceholder, { backgroundColor: getCategoryColor(item.category) + '40' }]}>
+      <Image source={PLACEHOLDER_LOGO} style={{ width: 40, height: 40, opacity: 0.4 }} resizeMode="contain" />
+    </View>
+  );
+}
 
 export function PlaceCard({ item, onPress, onFavorite, isFavorite, wide }) {
   return (
@@ -10,16 +38,17 @@ export function PlaceCard({ item, onPress, onFavorite, isFavorite, wide }) {
       onPress={() => onPress?.(item)}
       activeOpacity={0.7}
     >
-      <View style={[styles.imagePlaceholder, { backgroundColor: getCategoryColor(item.category) + '40' }]}>
-        <View style={styles.imageGlow}>
-          <Ionicons name="image-outline" size={28} color={COLORS.primaryLight} />
+      <PlaceImage item={item} />
+      {item.priceLevel && (
+        <View style={styles.priceBadge}>
+          <Text style={styles.priceText}>{item.priceLevel}</Text>
         </View>
-        {item.priceLevel && (
-          <View style={styles.priceBadge}>
-            <Text style={styles.priceText}>{item.priceLevel}</Text>
-          </View>
-        )}
-      </View>
+      )}
+      {item.demo && (
+        <View style={styles.demoBadge}>
+          <Text style={styles.demoBadgeText}>Demo</Text>
+        </View>
+      )}
       <TouchableOpacity
         style={styles.favoriteBtn}
         onPress={() => onFavorite?.(item.id)}
@@ -33,6 +62,7 @@ export function PlaceCard({ item, onPress, onFavorite, isFavorite, wide }) {
       </TouchableOpacity>
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+        {item.city && <Text style={styles.cardCity}>{item.city}</Text>}
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={13} color={COLORS.warning} />
           <Text style={styles.ratingText}>{item.rating}</Text>
@@ -242,19 +272,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
+  placeImage: {
+    width: '100%',
+    height: 130,
+  },
   imagePlaceholder: {
     height: 130,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-  },
-  imageGlow: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   priceBadge: {
     position: 'absolute',
@@ -270,6 +296,20 @@ const styles = StyleSheet.create({
   priceText: {
     ...FONTS.smallBold,
     color: COLORS.textPrimary,
+  },
+  demoBadge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    left: SPACING.sm,
+    backgroundColor: COLORS.warning + 'CC',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  demoBadgeText: {
+    ...FONTS.smallBold,
+    color: COLORS.black,
+    fontSize: 10,
   },
   favoriteBtn: {
     position: 'absolute',
@@ -288,6 +328,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...FONTS.bodyBold,
     color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  cardCity: {
+    ...FONTS.caption,
+    color: COLORS.textTertiary,
     marginBottom: 4,
   },
   ratingRow: {

@@ -10,6 +10,8 @@ import {
   startBackgroundSync, stopBackgroundSync, runSync, registerSyncHandler, getLastSyncTime, isSyncInProgress,
   loadRealtimePreference, isRealtimeEnabled, setRealtimeEnabled,
   fetchLivePlacesNearby, fetchLiveCityFromCoordinates, fetchLivePlacesByCity, persistLastLocation,
+  getAuthSession, signInAsGuest, isAuthenticated, onAuthStateChange,
+  naeroNotifications, naeroRealtime, trackScreenView,
 } from '../services';
 
 const AppContext = createContext();
@@ -43,6 +45,11 @@ const initialState = {
   realtimeEnabled: true,
   livePlaces: [],
   livePlacesLoading: false,
+  auth: null,
+  isAuthReady: false,
+  isAuthenticated: false,
+  unreadNotifications: 0,
+  notifications: [],
 };
 
 function appReducer(state, action) {
@@ -106,6 +113,16 @@ function appReducer(state, action) {
       return { ...state, livePlaces: action.payload, livePlacesLoading: false };
     case 'SET_LIVE_PLACES_LOADING':
       return { ...state, livePlacesLoading: action.payload };
+    case 'SET_AUTH':
+      return { ...state, auth: action.payload, isAuthReady: true, isAuthenticated: action.payload?.mode === 'authenticated' };
+    case 'SET_UNAUTHENTICATED':
+      return { ...state, auth: null, isAuthReady: true, isAuthenticated: false };
+    case 'SET_UNREAD_NOTIFICATIONS':
+      return { ...state, unreadNotifications: action.payload };
+    case 'SET_NOTIFICATIONS':
+      return { ...state, notifications: action.payload };
+    case 'ADD_NOTIFICATION':
+      return { ...state, notifications: [action.payload, ...state.notifications], unreadNotifications: state.unreadNotifications + 1 };
     case 'LOAD_STORED':
       return { ...state, ...action.payload };
     default:
@@ -125,12 +142,18 @@ export function getAIEngine() {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const engineInit = useRef(false);
+  const cleanupRef = useRef(null);
 
   useEffect(() => {
     loadStoredData();
     initAI();
     initSync();
     loadRealtimePref();
+    initAuth();
+    loadNotificationCount();
+    return () => {
+      if (cleanupRef.current) cleanupRef.current();
+    };
   }, []);
 
   useEffect(() => {
@@ -144,6 +167,52 @@ export function AppProvider({ children }) {
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEYS.SAVED_JOBS, JSON.stringify(state.savedJobs));
   }, [state.savedJobs]);
+
+  async function initAuth() {
+    const session = await getAuthSession();
+    if (session) {
+      dispatch({ type: 'SET_AUTH', payload: session });
+      const unsub = await onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+          dispatch({ type: 'SET_UNAUTHENTICATED' });
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          getAuthSession().then((s) => {
+            if (s) dispatch({ type: 'SET_AUTH', payload: s });
+          });
+        }
+      });
+      cleanupRef.current = unsub;
+      setupRealtime(session.user?.id);
+    } else {
+      const guest = await signInAsGuest();
+      dispatch({ type: 'SET_AUTH', payload: guest.session });
+    }
+  }
+
+  function setupRealtime(userId) {
+    if (!userId || userId === 'guest') return;
+    const unsubNotif = naeroRealtime.subscribeToNotifications(userId, (notification) => {
+      dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+    });
+    const unsubSaved = naeroRealtime.subscribeToSavedPlaces(userId, (payload) => {
+      if (payload.eventType === 'INSERT') {
+      } else if (payload.eventType === 'DELETE') {
+      }
+    });
+    const prev = cleanupRef.current;
+    cleanupRef.current = () => {
+      if (prev) prev();
+      unsubNotif();
+      unsubSaved();
+    };
+  }
+
+  async function loadNotificationCount() {
+    const result = await naeroNotifications.getUnreadCount();
+    if (result.data?.count !== undefined) {
+      dispatch({ type: 'SET_UNREAD_NOTIFICATIONS', payload: result.data.count });
+    }
+  }
 
   async function initAI() {
     if (engineInit.current) return;
@@ -197,6 +266,10 @@ export function AppProvider({ children }) {
 
   const toggleSavedJob = useCallback((id) => {
     dispatch({ type: 'TOGGLE_SAVED_JOB', payload: id });
+  }, []);
+
+  const toggleSavedPlace = useCallback((id) => {
+    dispatch({ type: 'TOGGLE_SAVED_PLACE', payload: id });
   }, []);
 
   const refreshAIProfile = useCallback(async () => {
@@ -284,10 +357,6 @@ export function AppProvider({ children }) {
     }
   }, [state.userCity]);
 
-  const toggleSavedPlace = useCallback((id) => {
-    dispatch({ type: 'TOGGLE_SAVED_PLACE', payload: id });
-  }, []);
-
   const triggerSync = useCallback(async () => {
     dispatch({ type: 'SET_IS_SYNCING', payload: true });
     const result = await runSync({ force: true });
@@ -332,6 +401,21 @@ export function AppProvider({ children }) {
     if (state.userCity) await loadNearbyData(state.userCity);
   }, [state.userCity, loadNearbyData]);
 
+  const setAuth = useCallback((authSession) => {
+    dispatch({ type: 'SET_AUTH', payload: authSession });
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    const result = await naeroNotifications.getAll();
+    if (result.data) {
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: result.data });
+    }
+    const countResult = await naeroNotifications.getUnreadCount();
+    if (countResult.data?.count !== undefined) {
+      dispatch({ type: 'SET_UNREAD_NOTIFICATIONS', payload: countResult.data.count });
+    }
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -349,6 +433,8 @@ export function AppProvider({ children }) {
         triggerSync,
         toggleRealtime,
         fetchLiveNearby,
+        setAuth,
+        fetchNotifications,
         placeService,
         serviceService,
         jobService,

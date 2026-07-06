@@ -21,10 +21,12 @@ import { useApp } from '../context/AppContext';
 import { LanguageModal } from '../components/LanguageModal';
 import { PrimaryButton, SecondaryButton } from '../components/BrandedButtons';
 import { saveManualCity, getManualCity, clearLocation } from '../services/locationService';
+import { signOut, signInAsGuest, trackAuth } from '../services';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
 const menuItems = [
+  { id: 'notifications', icon: 'notifications-outline', color: COLORS.primary },
   { id: 'settings', icon: 'settings-outline', color: COLORS.textSecondary, screen: 'Settings' },
   { id: 'saved', icon: 'heart-outline', color: COLORS.error },
   { id: 'savedJobs', icon: 'briefcase-outline', color: COLORS.primary },
@@ -37,7 +39,7 @@ const menuItems = [
 export default function ProfileScreen({ navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { favorites, savedJobs, savedPlaces, userLocation, userCity, hasLocationPermission, requestLocationPermission, refreshLocation, locationLoading } = useApp();
+  const { favorites, savedJobs, savedPlaces, userLocation, userCity, hasLocationPermission, requestLocationPermission, refreshLocation, locationLoading, auth, isAuthenticated, unreadNotifications } = useApp();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
   const [manualCity, setManualCity] = useState('');
@@ -46,6 +48,15 @@ export default function ProfileScreen({ navigation }) {
   const handleMenuPress = useCallback(
     (itemId) => {
       switch (itemId) {
+        case 'notifications':
+          navigation.navigate('Notifications');
+          break;
+        case 'saved':
+          navigation.navigate('Explore');
+          break;
+        case 'savedJobs':
+          navigation.navigate('Jobs');
+          break;
         case 'language':
           setShowLanguageModal(true);
           break;
@@ -68,6 +79,26 @@ export default function ProfileScreen({ navigation }) {
     [navigation]
   );
 
+  const handleLogout = useCallback(async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            await signInAsGuest();
+            trackAuth('sign_out');
+            navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+          },
+        },
+      ]
+    );
+  }, [navigation]);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}>
@@ -82,8 +113,8 @@ export default function ProfileScreen({ navigation }) {
                 <Ionicons name="pencil" size={12} color={COLORS.white} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.profileName}>{t('profile.guest')}</Text>
-            <Text style={styles.profileEmail}>guest@naero.app</Text>
+            <Text style={styles.profileName}>{isAuthenticated ? auth?.user?.displayName || 'User' : t('profile.guest')}</Text>
+            <Text style={styles.profileEmail}>{isAuthenticated ? auth?.user?.email || '' : 'Guest'}</Text>
           </View>
 
           <View style={styles.statsRow}>
@@ -110,6 +141,11 @@ export default function ProfileScreen({ navigation }) {
                 <Ionicons name={item.icon} size={20} color={item.color} />
               </View>
               <Text style={styles.menuLabel}>{t(`profile.${item.id}`)}</Text>
+              {item.id === 'notifications' && unreadNotifications > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadNotifications > 9 ? '9+' : unreadNotifications}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
             </TouchableOpacity>
           ))}
@@ -215,7 +251,7 @@ export default function ProfileScreen({ navigation }) {
           )}
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>{t('profile.logout')}</Text>
         </TouchableOpacity>
 
@@ -380,6 +416,21 @@ const styles = StyleSheet.create({
     ...FONTS.body,
     color: COLORS.textPrimary,
     flex: 1,
+  },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    marginRight: SPACING.sm,
+  },
+  badgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   logoutBtn: {
     marginHorizontal: SPACING.xl,
