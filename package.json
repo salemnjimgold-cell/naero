@@ -21,6 +21,7 @@
     "test:security:auth": "node tests/milestone5b_auth_storage.js",
     "test:security:android": "node tests/milestone5b_android_security.js",
     "test:design:foundations": "node tests/milestone5c_3a_foundations.js && node tests/milestone5c_3a_contrast.js",
+    "test:design:trust-states": "node tests/milestone5c_3b_trust_states.js",
     "typecheck:location": "tsc -p jsconfig.location.json",
     "typecheck:nearby": "tsc -p jsconfig.nearby.json",
     "backend:dev": "powershell -ExecutionPolicy Bypass -File scripts/backend-dev.ps1",
