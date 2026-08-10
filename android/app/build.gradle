@@ -4,6 +4,18 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
+def releaseSigningValue = { String name ->
+    def projectValue = findProperty(name)
+    return projectValue != null ? projectValue.toString() : System.getenv(name)
+}
+def releaseSigning = [
+    storeFile: releaseSigningValue('NAERO_RELEASE_STORE_FILE'),
+    storePassword: releaseSigningValue('NAERO_RELEASE_STORE_PASSWORD'),
+    keyAlias: releaseSigningValue('NAERO_RELEASE_KEY_ALIAS'),
+    keyPassword: releaseSigningValue('NAERO_RELEASE_KEY_PASSWORD'),
+]
+def releaseSigningConfigured = releaseSigning.values().every { it != null && !it.trim().isEmpty() }
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -104,15 +116,21 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig releaseSigningConfigured ? signingConfigs.release : null
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -129,6 +147,15 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def requestsReleaseArtifact = graph.allTasks.any { task ->
+        task.project == project && task.name in ['assembleRelease', 'bundleRelease', 'packageRelease']
+    }
+    if (requestsReleaseArtifact && !releaseSigningConfigured) {
+        throw new GradleException('Naero release signing is not configured. Provide all NAERO_RELEASE_* values outside Git.')
     }
 }
 
