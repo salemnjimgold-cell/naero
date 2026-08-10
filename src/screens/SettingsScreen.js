@@ -10,17 +10,23 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, BORDER, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { LanguageModal } from '../components/LanguageModal';
-import { clearLocation } from '../services/locationService';
+import { ManualCityModal } from '../components/ManualCityModal';
 
 export default function SettingsScreen({ navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { hasLocationPermission, userCity, refreshLocation } = useApp();
+  const {
+    hasLocationPermission, hasDeviceLocationPermission, userCity,
+    locationPreference, locationLoading, requestLocationPermission,
+    selectManualCity, disableLocation, clearLocationData,
+  } = useApp();
   const [showLanguage, setShowLanguage] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showManualCity, setShowManualCity] = useState(false);
 
   const settings = [
     {
@@ -63,6 +69,7 @@ export default function SettingsScreen({ navigation }) {
                   key={item.id}
                   style={[styles.row, i < section.items.length - 1 && styles.rowBorder]}
                   onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                     if (item.id === 'language') setShowLanguage(true);
                     if (item.id === 'privacy') setShowPrivacy(!showPrivacy);
                   }}
@@ -90,19 +97,48 @@ export default function SettingsScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.privacyLabel}>Location Status</Text>
               <Text style={styles.privacyValue}>
-                {hasLocationPermission ? 'Active' : 'Disabled'}
+                {hasLocationPermission
+                  ? (locationPreference === 'manual' ? 'Manual city' : 'Device location active')
+                  : 'Disabled'}
                 {userCity ? ` - ${userCity}` : ''}
               </Text>
             </View>
           </View>
           <View style={styles.privacyDivider} />
           <Text style={styles.privacyDesc}>
-            Location is only used to show nearby services, places, and community
-            help. Your location never leaves your device unless you explicitly
-            search for nearby places. You can disable access anytime in device
-            Settings.
+            Naero requests foreground location only. Your last location choice is
+            stored on this device. You can use a manual city, disable Naero&apos;s use
+            of location, or clear all stored location data at any time.
           </Text>
           <View style={styles.privacyDivider} />
+          <TouchableOpacity
+            style={styles.privacyAction}
+            onPress={() => setShowManualCity(true)}
+            disabled={locationLoading}
+          >
+            <Ionicons name="create-outline" size={16} color={COLORS.primary} />
+            <Text style={[styles.privacyActionText, { color: COLORS.primary }]}>Change City Manually</Text>
+          </TouchableOpacity>
+          {!hasDeviceLocationPermission && (
+            <TouchableOpacity
+              style={styles.privacyAction}
+              onPress={requestLocationPermission}
+              disabled={locationLoading}
+            >
+              <Ionicons name="location-outline" size={16} color={COLORS.primary} />
+              <Text style={[styles.privacyActionText, { color: COLORS.primary }]}>Enable Device Location</Text>
+            </TouchableOpacity>
+          )}
+          {locationPreference !== 'off' && (
+            <TouchableOpacity
+              style={styles.privacyAction}
+              onPress={disableLocation}
+              disabled={locationLoading}
+            >
+              <Ionicons name="pause-circle-outline" size={16} color={COLORS.warning} />
+              <Text style={[styles.privacyActionText, { color: COLORS.warning }]}>Disable Location Use</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.privacyAction}
             onPress={() => {
@@ -115,8 +151,7 @@ export default function SettingsScreen({ navigation }) {
                     text: 'Clear',
                     style: 'destructive',
                     onPress: async () => {
-                      await clearLocation();
-                      refreshLocation();
+                      await clearLocationData();
                       setShowPrivacy(false);
                     },
                   },
@@ -131,6 +166,13 @@ export default function SettingsScreen({ navigation }) {
       )}
 
       <LanguageModal visible={showLanguage} onClose={() => setShowLanguage(false)} />
+      <ManualCityModal
+        visible={showManualCity}
+        initialCity={userCity || ''}
+        loading={locationLoading}
+        onClose={() => setShowManualCity(false)}
+        onSave={selectManualCity}
+      />
     </View>
   );
 }
@@ -154,7 +196,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },

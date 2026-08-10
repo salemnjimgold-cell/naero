@@ -2,6 +2,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { readEnv, getPublicConfig, validateEnv } = require('./config/env');
 const { getCorsHeaders } = require('./http/cors');
+const { getSecurityHeaders } = require('./http/security');
 const { sendJson, readJson } = require('./http/respond');
 const { authenticateRequest } = require('./middleware/auth');
 const { logger } = require('./observability/logger');
@@ -18,6 +19,7 @@ const { createActivityRoutes } = require('./routes/activity');
 const { createModerationRoutes } = require('./routes/moderation');
 const { createAIServices } = require('./services/ai/index');
 const { createAIRoutes } = require('./routes/ai');
+const { createGatewayRoutes } = require('./routes/gateway');
 
 function createRequestHandler(options = {}) {
   const env = options.env || readEnv();
@@ -31,29 +33,42 @@ function createRequestHandler(options = {}) {
   const moderationRoutes = options.moderationRoutes || createModerationRoutes(env, repositories);
   const aiServices = options.aiServices || createAIServices(env, repositories, profileStore);
   const aiRoutes = options.aiRoutes || createAIRoutes(env, repositories, aiServices);
+  const gatewayRoutes = options.gatewayRoutes || createGatewayRoutes(env, options.gatewayOptions);
 
   return async function requestHandler(req, res) {
-    req.requestId = req.headers['x-request-id'] || crypto.randomUUID();
-    const corsHeaders = getCorsHeaders(req, env.corsOrigins);
+    const suppliedRequestId = req.headers['x-request-id'];
+    req.requestId = typeof suppliedRequestId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(suppliedRequestId)
+      ? suppliedRequestId
+      : crypto.randomUUID();
+    const responseHeaders = { ...getSecurityHeaders(), ...getCorsHeaders(req, env.corsOrigins), 'x-request-id': req.requestId };
     const startedAt = Date.now();
 
     if (req.method === 'OPTIONS') {
-      sendJson(res, 204, {}, { ...corsHeaders, 'x-request-id': req.requestId });
+      sendJson(res, 204, {}, responseHeaders);
       return;
     }
 
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
     try {
+      if (url.pathname.startsWith('/api/v1/')) {
+        const result = await gatewayRoutes.handle(req, url);
+        if (result) {
+          logger.request(req, { statusCode: result.status, durationMs: Date.now() - startedAt, error: result.body.error?.code });
+          sendJson(res, result.status, result.body, responseHeaders);
+          return;
+        }
+      }
+
       if (req.method === 'GET' && url.pathname === '/health') {
         logger.request(req, { statusCode: 200, durationMs: Date.now() - startedAt });
-        sendJson(res, 200, healthRoute(env), { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, 200, healthRoute(env), responseHeaders);
         return;
       }
 
       if (req.method === 'GET' && url.pathname === '/v1/config') {
         logger.request(req, { statusCode: 200, durationMs: Date.now() - startedAt });
-        sendJson(res, 200, getPublicConfig(env), { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, 200, getPublicConfig(env), responseHeaders);
         return;
       }
 
@@ -61,7 +76,7 @@ function createRequestHandler(options = {}) {
         const auth = await authenticateRequest(req, env);
         if (!auth.ok) {
           logger.request(req, { statusCode: auth.statusCode, durationMs: Date.now() - startedAt, auth: auth.code });
-          sendJson(res, auth.statusCode, { error: { code: auth.code, message: auth.message } }, { ...corsHeaders, 'x-request-id': req.requestId });
+          sendJson(res, auth.statusCode, { error: { code: auth.code, message: auth.message } }, responseHeaders);
           return;
         }
 
@@ -74,7 +89,7 @@ function createRequestHandler(options = {}) {
         if (result.error) {
           const status = result.error.code === 'METHOD_NOT_ALLOWED' ? 405 : 503;
           logger.request(req, { statusCode: status, durationMs: Date.now() - startedAt, error: result.error.code });
-          sendJson(res, status, { error: result.error }, { ...corsHeaders, 'x-request-id': req.requestId });
+          sendJson(res, status, { error: result.error }, responseHeaders);
           return;
         }
 
@@ -89,7 +104,7 @@ function createRequestHandler(options = {}) {
         }
 
         logger.request(req, { statusCode: 200, durationMs: Date.now() - startedAt });
-        sendJson(res, 200, { data: result.data }, { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, 200, { data: result.data }, responseHeaders);
         return;
       }
 
@@ -97,7 +112,7 @@ function createRequestHandler(options = {}) {
         const auth = await authenticateRequest(req, env);
         const result = await uploadRoutes.handleUpload(req, res, url, auth, readJson);
         logger.request(req, { statusCode: result.status, durationMs: Date.now() - startedAt });
-        sendJson(res, result.status, result.body, { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, result.status, result.body, responseHeaders);
         return;
       }
 
@@ -105,7 +120,7 @@ function createRequestHandler(options = {}) {
         const auth = await authenticateRequest(req, env);
         const result = await notificationRoutes.handleNotifications(req, res, url, auth);
         logger.request(req, { statusCode: result.status, durationMs: Date.now() - startedAt });
-        sendJson(res, result.status, result.body, { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, result.status, result.body, responseHeaders);
         return;
       }
 
@@ -113,7 +128,7 @@ function createRequestHandler(options = {}) {
         const auth = await authenticateRequest(req, env);
         const result = await activityRoutes.handleActivity(req, res, url, auth);
         logger.request(req, { statusCode: result.status, durationMs: Date.now() - startedAt });
-        sendJson(res, result.status, result.body, { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, result.status, result.body, responseHeaders);
         return;
       }
 
@@ -121,7 +136,7 @@ function createRequestHandler(options = {}) {
         const auth = await authenticateRequest(req, env);
         const result = await moderationRoutes.handleModeration(req, res, url, auth, readJson);
         logger.request(req, { statusCode: result.status, durationMs: Date.now() - startedAt });
-        sendJson(res, result.status, result.body, { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, result.status, result.body, responseHeaders);
         return;
       }
 
@@ -129,16 +144,16 @@ function createRequestHandler(options = {}) {
         const auth = await authenticateRequest(req, env);
         const result = await aiRoutes.handleAI(req, res, url, auth);
         logger.request(req, { statusCode: result.status, durationMs: Date.now() - startedAt });
-        sendJson(res, result.status, result.body, { ...corsHeaders, 'x-request-id': req.requestId });
+        sendJson(res, result.status, result.body, responseHeaders);
         return;
       }
 
       logger.request(req, { statusCode: 404, durationMs: Date.now() - startedAt });
-      sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Route not found.' } }, { ...corsHeaders, 'x-request-id': req.requestId });
+      sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Route not found.' } }, responseHeaders);
     } catch (error) {
       logger.error('Unhandled backend request error', { path: url.pathname, error: error.message });
       emitMonitoringEvent(env, 'backend.unhandled_error', { path: url.pathname, error: error.message });
-      sendJson(res, error.statusCode || 500, { error: { code: 'INTERNAL_ERROR', message: 'Unexpected server error.' } }, { ...corsHeaders, 'x-request-id': req.requestId });
+      sendJson(res, error.statusCode || 500, { error: { code: 'INTERNAL_ERROR', message: 'Unexpected server error.' } }, responseHeaders);
     }
   };
 }

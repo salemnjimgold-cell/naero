@@ -5,10 +5,8 @@
   },
   "nav": {
     "home": "Home",
-    "explore": "Explore",
-    "services": "Services",
-    "community": "Community",
-    "profile": "Profile"
+    "world": "World",
+    "people": "People"
   },
   "home": {
     "greeting": "Welcome",
@@ -148,6 +146,28 @@
     "fr": "Français",
     "hu": "Magyar"
   },
+  "hub": {
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "greetingNight": "Good night",
+    "askNaero": "Ask Naero anything...",
+    "nextStepTitle": "Your next step",
+    "nextStepBank": "Apply for your work permit",
+    "nextStepBankDesc": "Most newcomers do this in their 3rd week. You'll need your passport, proof of address, and €60.",
+    "startAction": "Start",
+    "sinceLastTime": "Since last time",
+    "doneSim": "SIM card",
+    "doneBank": "Bank account",
+    "doneAddress": "Address registration",
+    "nearby": "Nearby",
+    "nearbyBakery": "A bakery that speaks your language. The owner is kind.",
+    "nearbyCommunity": "Community center. Thursday gatherings. People like you go there.",
+    "peopleLikeYou": "People like you",
+    "personAmira": "Amira arrived 2 weeks before you. She found housing on Maple St.",
+    "personCarlos": "Carlos was a chef back home. He's looking for work.",
+    "journeyTitle": "Your journey"
+  },
   "common": {
     "loading": "Loading...",
     "error": "Something went wrong",
@@ -161,6 +181,16 @@
     "done": "Done",
     "noData": "No data available",
     "offline": "You are offline"
+  },
+  "discover": {
+    "title": "Discover",
+    "subtitle": "Find what you need nearby",
+    "searchPlaceholder": "Search places, services...",
+    "all": "All",
+    "places": "Places",
+    "services": "Services",
+    "noResults": "No results found",
+    "nearbyTitle": "Nearby"
   },
   "categories": {
     "restaurants": "Restaurants & Cafes",

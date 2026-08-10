@@ -42,21 +42,17 @@ export {
   getManualCity,
   clearLocation,
   hasLocationPermission,
+  initializeLocation,
+  requestForegroundLocation,
+  refreshLocationState,
+  reverseGeocodeLocation,
+  setManualLocation,
+  disableLocationUse,
+  clearStoredLocationData,
+  getLocationServicesEnabled,
+  startSignificantLocationUpdates,
+  stopSignificantLocationUpdates,
 } from './locationService';
-
-export {
-  searchNearbyPlaces,
-  searchCityPlaces,
-  queryOverpass,
-  reverseGeocode,
-  searchCity,
-  searchPlace,
-  configureGooglePlaces,
-  isGooglePlacesConfigured,
-  nearbySearch,
-  textSearch,
-  placeDetails,
-} from './api';
 
 export {
   CacheService,

@@ -7,6 +7,7 @@
 | `001_core_auth_profiles.sql` | Auth, profiles, user_settings, consent_events, RLS | Sprint 2 |
 | `002_core_data_tables.sql` | Places, reviews, reports, ai_conversations, ai_messages, saved_places, indexes, RLS | Sprint 3 Database Sprint 1 |
 | `003_platform_foundation.sql` | Storage buckets, RLS, notifications, activity_logs, moderation_queue, moderation_actions, review moderation status, realtime publication, performance indexes, trgm indexes | Sprint 3.5 |
+| `005_postgis_verified_services.sql` | PostGIS-backed verified service categories, records, verification audit log, provider links, RLS, and public-safe nearby RPC | Milestone 4 |
 
 ## Apply Migrations
 
@@ -42,11 +43,22 @@
     create extension if not exists pg_trgm;
     ```
 12. Apply seed data from `backend/db/seeds/001_sample_places.sql` (optional, for dev/staging).
-13. Repeat for production only after staging smoke tests pass.
+13. Run `backend/db/migrations/005_postgis_verified_services.sql`.
+14. Confirm PostGIS is installed in the `extensions` schema. Migration 005 fails transactionally with `POSTGIS_SCHEMA_MISMATCH` before creating Milestone 4 tables if an existing PostGIS installation is in another schema.
+15. Confirm these tables exist:
+   - `public.service_categories`
+   - `public.verified_services`
+   - `public.service_verification_log`
+   - `public.service_provider_links`
+16. Verify `public.nearby_verified_services(...)` through anonymous and authenticated roles, including draft, expired, inactive, invalid-coordinate, and maximum-radius cases. Its PostgREST arguments are prefixed with `p_` (`p_latitude`, `p_longitude`, `p_radius_meters`, `p_category_key`, `p_filter_country_code`, `p_result_limit`, `p_language`).
+17. Do not load `backend/db/seeds/001_sample_places.sql` into the verified-services tables; verified records require controlled provenance and verification.
+18. Repeat for production only after staging migration, RLS, query-plan, and smoke tests pass.
 
 ## Migration Order
 
-Migrations must be applied sequentially. Migration 002 depends on the `set_updated_at()` function and `auth.users` reference established in 001. Migration 003 depends on tables from 002.
+Migrations must be applied sequentially. Migration 002 depends on the `set_updated_at()` function and `auth.users` reference established in 001. Migration 003 depends on tables from 002. Migration 005 depends on `set_updated_at()` from 001 and deliberately keeps verified services separate from the user-generated `public.places` model.
+
+Migration 005's rollback is `backend/db/rollbacks/005_postgis_verified_services.rollback.sql`. It removes the Milestone 4 RPC and tables but retains PostGIS because other database objects may adopt the extension later.
 
 ## Table Reference
 

@@ -34,10 +34,10 @@ export class UserProfile {
 
   static statuses = {
     tourist: { icon: 'airplane', color: '#3B82F6' },
-    worker: { icon: 'briefcase', color: '#10B981' },
+    worker: { icon: 'briefcase', color: '#3B82F6' },
     student: { icon: 'school', color: '#F59E0B' },
     refugee: { icon: 'people', color: '#8B5CF6' },
-    resident: { icon: 'home', color: '#06B6D4' },
+    resident: { icon: 'home', color: '#60A5FA' },
     visitor: { icon: 'compass', color: '#EC4899' },
   };
 }

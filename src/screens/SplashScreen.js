@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../theme/design-tokens';
+import { colors } from '../theme';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 const HAS_LAUNCHED_KEY = '@naero_has_launched';
@@ -45,7 +45,7 @@ export default function SplashScreen({ navigation }) {
           toValue: 0,
           duration: fadeOut,
           easing: Easing.in(Easing.ease),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ]).start(() => {
         navigation.replace('Welcome');

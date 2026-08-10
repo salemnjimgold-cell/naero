@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, FONTS, SPACING, RADIUS } from '../theme';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
@@ -37,7 +37,7 @@ export default function AboutScreen({ navigation }) {
         <View style={styles.logoSection}>
           <View style={styles.logoWrap}>
             <LinearGradient
-              colors={['rgba(6,182,212,0.12)', 'rgba(6,182,212,0.02)']}
+              colors={['rgba(59,130,246,0.12)', 'rgba(59,130,246,0.02)']}
               style={styles.logoBg}
             />
             <Image
@@ -47,7 +47,7 @@ export default function AboutScreen({ navigation }) {
             />
           </View>
           <Text style={styles.tagline}>Not a stranger anymore</Text>
-          <Text style={styles.brandName}>Naero v1.0.0</Text>
+          <Text style={styles.brandName}>Naero v1.2.0</Text>
         </View>
 
         <View style={styles.card}>
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },

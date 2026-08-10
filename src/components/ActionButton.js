@@ -1,16 +1,23 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { colors, spacing, radii, type, shadows } from '../theme/design-tokens';
+import * as Haptics from 'expo-haptics';
+import { colors, spacing, radii, type, shadows } from '../theme';
 
 export default function ActionButton({ title, onPress, loading, disabled, style, textStyle }) {
+  const isDisabled = disabled || loading;
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onPress?.();
+  };
   return (
     <TouchableOpacity
       style={[styles.button, disabled && styles.disabled, style]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.85}
-      disabled={disabled || loading}
+      disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={title}
+      accessibilityState={{ disabled: isDisabled }}
     >
       {loading ? (
         <ActivityIndicator color={colors.text.inverse} size="small" />

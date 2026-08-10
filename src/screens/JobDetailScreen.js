@@ -11,8 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import * as Haptics from 'expo-haptics';
 
 const TYPE_META = {
   'full-time': { icon: 'briefcase', label: 'Full-Time', color: COLORS.primary },
@@ -31,6 +32,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const meta = TYPE_META[item.type] || TYPE_META['full-time'];
 
   const handleApply = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     Linking.openURL(`mailto:${item.contact}`);
   };
 
@@ -133,7 +135,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -141,7 +143,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -226,7 +228,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   tag: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     borderRadius: RADIUS.full,
     paddingHorizontal: 12,
     paddingVertical: 6,

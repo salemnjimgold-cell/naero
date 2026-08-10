@@ -15,19 +15,20 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
+import { COLORS, ACCENT, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
 import { mockCategories } from '../data/providers/mockCategories';
 import { EmptyState } from '../components/EmptyState';
 import { useApp } from '../context/AppContext';
+import * as Haptics from 'expo-haptics';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 const { width } = Dimensions.get('window');
 const CARD_W = (width - SPACING.xl * 2 - SPACING.md) / 2;
 
 const palette = [
-  { bg: '#06B6D412', icon: '#06B6D4', border: '#06B6D425', grad: ['#06B6D420', '#06B6D406'] },
-  { bg: '#10B98112', icon: '#10B981', border: '#10B98125', grad: ['#10B98120', '#10B98106'] },
-  { bg: '#8B5CF612', icon: '#8B5CF6', border: '#8B5CF625', grad: ['#8B5CF620', '#8B5CF606'] },
+  { bg: ACCENT.primary + '12', icon: ACCENT.primary, border: ACCENT.primary + '25', grad: [ACCENT.primary + '20', ACCENT.primary + '06'] },
+  { bg: '#3B82F612', icon: '#3B82F6', border: '#3B82F625', grad: ['#3B82F620', '#3B82F606'] },
+  { bg: ACCENT.light + '12', icon: ACCENT.light, border: ACCENT.light + '25', grad: [ACCENT.light + '20', ACCENT.light + '06'] },
   { bg: '#F59E0B12', icon: '#F59E0B', border: '#F59E0B25', grad: ['#F59E0B20', '#F59E0B06'] },
   { bg: '#EF444412', icon: '#EF4444', border: '#EF444425', grad: ['#EF444420', '#EF444406'] },
   { bg: '#3B82F612', icon: '#3B82F6', border: '#3B82F625', grad: ['#3B82F620', '#3B82F606'] },
@@ -105,13 +106,14 @@ export default function ServicesScreen({ navigation }) {
   }, [hasLocationPermission, allServices]);
 
   const handleServicePress = useCallback((item) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     navigation.navigate('ServiceDetail', { item });
   }, [navigation]);
 
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+        colors={['rgba(59,130,246,0.06)', COLORS.bg]}
         style={[styles.header, { paddingTop: insets.top + SPACING.md }]}
       >
         <View style={styles.headerRow}>
@@ -171,7 +173,7 @@ export default function ServicesScreen({ navigation }) {
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={!activeCategory ? ['#06B6D4', '#0891B2'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.05)']}
+                colors={!activeCategory ? [ACCENT.primary, ACCENT.dark] : ['rgba(248,250,252,0.04)', 'rgba(248,250,252,0.04)']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.categoryChipGrad}
@@ -193,7 +195,7 @@ export default function ServicesScreen({ navigation }) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={activeCategory === cat.id ? ['#06B6D4', '#0891B2'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.05)']}
+                  colors={activeCategory === cat.id ? [ACCENT.primary, ACCENT.dark] : ['rgba(248,250,252,0.04)', 'rgba(248,250,252,0.04)']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.categoryChipGrad}

@@ -36,9 +36,9 @@ export class CommunityPost {
   }
 
   static types = {
-    post: { icon: 'chatbubble', color: '#06B6D4' },
+    post: { icon: 'chatbubble', color: '#3B82F6' },
     question: { icon: 'help-circle', color: '#F59E0B' },
-    review: { icon: 'star', color: '#10B981' },
+    review: { icon: 'star', color: '#3B82F6' },
     warning: { icon: 'warning', color: '#EF4444' },
     tip: { icon: 'bulb', color: '#8B5CF6' },
     alert: { icon: 'alert-circle', color: '#EF4444' },

@@ -12,7 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { naeroNotifications, trackScreenView } from '../services';
 import { EmptyState } from '../components/EmptyState';
@@ -88,7 +89,10 @@ export default function NotificationsScreen({ navigation }) {
     return (
       <TouchableOpacity
         style={[styles.notifItem, !item.read && styles.notifUnread]}
-        onPress={() => handleMarkRead(item.id)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          handleMarkRead(item.id);
+        }}
         activeOpacity={0.7}
       >
         <View style={[styles.notifIcon, { backgroundColor: color + '15' }]}>
@@ -113,7 +117,7 @@ export default function NotificationsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+        colors={['rgba(59,130,246,0.06)', COLORS.bg]}
         style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}
       >
         <View style={styles.headerRow}>
@@ -185,7 +189,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,43 +1,35 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
-  TextInput,
+  TextInput as RNTextInput,
   TouchableOpacity,
   FlatList,
-  Platform,
   StyleSheet,
   Animated,
-  Dimensions,
-  Image,
   Keyboard,
-  Switch,
+  Image,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
+import Text from '../components/Text';
+import IconButton from '../components/IconButton';
 import { useApp } from '../context/AppContext';
 import { naeroAI, trackAIRequest, isAuthenticated as checkAuth } from '../services';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
-const { width } = Dimensions.get('window');
-
 const QUICK_ACTIONS = [
-  { id: 'residency', icon: 'document-text-outline', label: 'Residency', color: COLORS.primary },
-  { id: 'housing', icon: 'home-outline', label: 'Housing', color: COLORS.secondary },
-  { id: 'jobs', icon: 'briefcase-outline', label: 'Jobs', color: COLORS.accent },
-  { id: 'translate', icon: 'language-outline', label: 'Translate', color: COLORS.purple },
-  { id: 'healthcare', icon: 'medkit-outline', label: 'Healthcare', color: COLORS.error },
-  { id: 'safety', icon: 'shield-checkmark-outline', label: 'Safety', color: COLORS.warning },
-  { id: 'transport', icon: 'bus-outline', label: 'Transport', color: COLORS.info },
-  { id: 'food', icon: 'restaurant-outline', label: 'Food', color: COLORS.secondary },
+  { id: 'residency', icon: 'document-text-outline', label: 'Residency' },
+  { id: 'housing', icon: 'home-outline', label: 'Housing' },
+  { id: 'jobs', icon: 'briefcase-outline', label: 'Jobs' },
+  { id: 'translate', icon: 'language-outline', label: 'Translate' },
 ];
 
 export default function AIScreen({ navigation }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { getAIEngine, refreshAIProfile, language, userLocation, userCity, hasLocationPermission, isAuthenticated } = useApp();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([]);
@@ -126,19 +118,20 @@ export default function AIScreen({ navigation }) {
       const msg = text || input.trim();
       if (!msg || isThinking || !aiReady) return;
 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       const userMsg = { id: Date.now().toString(), role: 'user', content: msg };
       setMessages((prev) => [...prev, userMsg]);
       setInput('');
       setIsThinking(true);
       scheduleScroll();
 
-      trackAIRequest('gpt-4o', 'naero', QUICK_ACTIONS.find(a => msg.toLowerCase().includes(a.label.toLowerCase()))?.id);
+      trackAIRequest('gpt-4o', 'naero', null);
 
       try {
         const result = await naeroAI.sendMessage(msg, {
           conversationId: conversationIdRef.current,
           ragEnabled,
-          topic: QUICK_ACTIONS.find(a => msg.toLowerCase().includes(a.label.toLowerCase()))?.id || null,
+          topic: null,
         });
 
         const dbg = result._debug || {};
@@ -161,6 +154,8 @@ export default function AIScreen({ navigation }) {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
             content,
+            sourceType: result.ragMetrics ? 'knowledge' : null,
+            provider: result.ragMetrics ? 'Naero Knowledge' : 'Naero AI',
           };
           setMessages((prev) => [...prev, aiMsg]);
           conversationIdRef.current = result.conversationId;
@@ -181,10 +176,20 @@ export default function AIScreen({ navigation }) {
 
   const handleQuickAction = useCallback(
     (actionId) => {
+      Haptics.selectionAsync().catch(() => {});
       const action = QUICK_ACTIONS.find((a) => a.id === actionId);
       if (!action) return;
       setInput('');
       handleSend('Tell me about ' + action.label);
+    },
+    [handleSend]
+  );
+
+  const handleSuggestedPrompt = useCallback(
+    (prompt) => {
+      Haptics.selectionAsync().catch(() => {});
+      setInput('');
+      handleSend(prompt);
     },
     [handleSend]
   );
@@ -205,109 +210,170 @@ export default function AIScreen({ navigation }) {
 
   const inputPaddingBottom = Math.max(SPACING.lg, insets.bottom + 6);
 
-  const renderMessage = ({ item }) => (
-    <View style={[styles.messageRow, item.role === 'user' ? styles.userRow : styles.aiRow]}>
-      {item.role === 'assistant' && (
-        <View style={styles.aiAvatarSm}>
-          <Image source={LOGO} style={{ width: 22, height: 22 }} resizeMode="contain" />
-        </View>
-      )}
-      <View
-        style={[
-          styles.messageBubble,
-          item.role === 'user' ? styles.userBubble : styles.aiBubble,
-        ]}
-      >
-        <Text style={[styles.messageText, item.role === 'user' && styles.userText]}>
-          {item.content}
+  const getStatusText = () => {
+    if (isThinking) return t('ai.thinking');
+    if (!isAuthenticated) return 'Guest Mode';
+    return 'Ready';
+  };
+
+  const renderSourceBadge = (sourceType) => {
+    if (!sourceType) return null;
+    return (
+      <View style={styles.sourceBadge}>
+        <Ionicons name="book-outline" size={10} color={COLORS.primary} />
+        <Text variant="small" color="tertiary" style={styles.sourceBadgeText}>
+          {sourceType === 'knowledge' ? 'Knowledge' : 'AI'}
         </Text>
       </View>
-    </View>
-  );
+    );
+  };
 
-  const renderWelcome = () => (
-    <View style={styles.welcomeWrap}>
-      <View style={styles.mascotSection}>
-        <Image source={LOGO} style={{ width: 96, height: 96 }} resizeMode="contain" />
-      </View>
-      <Text style={styles.welcomeTitle}>Naero AI</Text>
-      <Text style={styles.welcomeSub}>{t('ai.subtitle')}</Text>
-
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>How can I help?</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      {isAuthenticated && (
-        <View style={styles.ragToggleRow}>
-          <Text style={styles.ragToggleLabel}>Knowledge Search</Text>
-          <Switch
-            value={ragEnabled}
-            onValueChange={setRagEnabled}
-            trackColor={{ false: COLORS.cardBorder, true: COLORS.primary + '60' }}
-            thumbColor={ragEnabled ? COLORS.primary : COLORS.textTertiary}
-          />
-        </View>
-      )}
-
-      <View style={styles.quickGrid}>
-        {QUICK_ACTIONS.map((action) => (
-          <TouchableOpacity
-            key={action.id}
-            style={styles.quickChip}
-            onPress={() => handleQuickAction(action.id)}
-            activeOpacity={0.7}
+  const renderMessage = ({ item }) => {
+    if (item.id === 'welcome' && showWelcome) return null;
+    return (
+      <View style={[styles.messageRow, item.role === 'user' ? styles.userRow : styles.aiRow]}>
+        {item.role === 'assistant' && (
+          <View style={styles.aiAvatarSm}>
+            <Image source={LOGO} style={{ width: 20, height: 20 }} resizeMode="contain" />
+          </View>
+        )}
+        <View style={styles.messageContent}>
+          <View
+            style={[
+              styles.messageBubble,
+              item.role === 'user' ? styles.userBubble : styles.aiBubble,
+            ]}
           >
-            <LinearGradient
-              colors={[action.color + '18', action.color + '06']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.quickChipInner}
+            <Text variant="body" color={item.role === 'user' ? 'primary' : 'primary'}>
+              {item.content}
+            </Text>
+          </View>
+          {item.role === 'assistant' && renderSourceBadge(item.sourceType)}
+        </View>
+      </View>
+    );
+  };
+
+  const renderWelcome = () => {
+    const examples = t('ai.examples', { returnObjects: true }) || [];
+    return (
+      <View style={styles.welcomeWrap}>
+        <View style={styles.welcomeLogoWrap}>
+          <Image source={LOGO} style={{ width: 48, height: 48 }} resizeMode="contain" />
+        </View>
+        <Text variant="h2" color="primary" align="center" style={styles.welcomeTitle}>
+          {t('ai.title')}
+        </Text>
+        <Text variant="body" color="secondary" align="center" style={styles.welcomeSub}>
+          {t('ai.subtitle')}
+        </Text>
+
+        {Array.isArray(examples) && examples.length > 0 && (
+          <View style={styles.suggestedSection}>
+            <Text variant="smallBold" color="tertiary" style={styles.suggestedLabel}>
+              Try asking
+            </Text>
+            <View style={styles.suggestedGrid}>
+              {examples.slice(0, 4).map((prompt, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.suggestedChip}
+                  onPress={() => handleSuggestedPrompt(prompt)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.suggestedChipIcon}>
+                    <Ionicons
+                      name={['document-text-outline', 'home-outline', 'briefcase-outline', 'language-outline'][idx % 4]}
+                      size={14}
+                      color={COLORS.primary}
+                    />
+                  </View>
+                  <Text variant="caption" color="secondary" style={styles.suggestedChipText} numberOfLines={2}>
+                    {prompt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text variant="smallBold" color="tertiary">
+            Quick Topics
+          </Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {isAuthenticated && (
+          <View style={styles.ragToggleRow}>
+            <View style={styles.ragToggleInfo}>
+              <Ionicons name="search-outline" size={16} color={COLORS.textSecondary} />
+              <Text variant="caption" color="secondary" style={{ marginLeft: SPACING.sm }}>
+                Knowledge Search
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.ragToggleSwitch, ragEnabled && styles.ragToggleSwitchActive]}
+              onPress={() => setRagEnabled((p) => !p)}
+              activeOpacity={0.7}
             >
-              <Ionicons name={action.icon} size={18} color={action.color} />
-              <Text style={[styles.quickChipLabel, { color: action.color }]}>
+              <View style={[styles.ragToggleThumb, ragEnabled && styles.ragToggleThumbActive]} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.quickGrid}>
+          {QUICK_ACTIONS.map((action) => (
+            <TouchableOpacity
+              key={action.id}
+              style={styles.quickChip}
+              onPress={() => handleQuickAction(action.id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={action.icon} size={18} color={COLORS.textSecondary} />
+              <Text variant="caption" color="secondary" style={styles.quickChipLabel}>
                 {action.label}
               </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
-        style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}
-      >
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity
+          <IconButton
+            icon="chevron-back"
+            size={20}
+            color={COLORS.textPrimary}
+            containerSize={36}
             onPress={() => navigation.canGoBack() && navigation.goBack()}
-            style={styles.headerBtn}
-          >
-            <Ionicons name="chevron-back" size={22} color={COLORS.textPrimary} />
-          </TouchableOpacity>
+          />
           <View style={styles.headerAvatar}>
-            <Image source={LOGO} style={{ width: 28, height: 28 }} resizeMode="contain" />
-            <View style={[styles.onlineDot, { backgroundColor: COLORS.success }]} />
+            <Image source={LOGO} style={{ width: 24, height: 24 }} resizeMode="contain" />
+            <View style={styles.onlineDot} />
           </View>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            onLongPress={() => setShowDebug((p) => !p)}
-            delayLongPress={2000}
-          >
-            <Text style={styles.headerTitle}>Naero AI</Text>
-            <Text style={styles.headerSub}>
-              {isThinking ? 'Thinking...' : (isAuthenticated ? 'AI Assistant' : 'Guest Mode')}
+          <View style={{ flex: 1 }}>
+            <Text variant="h3" color="primary">
+              {t('ai.title')}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={clearChat} style={styles.headerBtn}>
-            <Ionicons name="refresh-outline" size={20} color={COLORS.textTertiary} />
-          </TouchableOpacity>
+            <Text variant="small" color={isThinking ? 'brand' : 'tertiary'} style={{ marginTop: 1 }}>
+              {getStatusText()}
+            </Text>
+          </View>
+          <IconButton
+            icon="refresh-outline"
+            size={18}
+            color={COLORS.textTertiary}
+            containerSize={36}
+            onPress={clearChat}
+          />
         </View>
-      </LinearGradient>
+      </View>
 
       <FlatList
         ref={flatListRef}
@@ -326,17 +392,13 @@ export default function AIScreen({ navigation }) {
           isThinking && !showWelcome ? (
             <View style={[styles.messageRow, styles.aiRow]}>
               <View style={styles.aiAvatarSm}>
-                <Image source={LOGO} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                <Image source={LOGO} style={{ width: 20, height: 20 }} resizeMode="contain" />
               </View>
               <View style={[styles.messageBubble, styles.aiBubble]}>
                 <View style={styles.thinkingRow}>
                   <Animated.View style={[styles.thinkDot, { opacity: dotOpacity }]} />
-                  <Animated.View
-                    style={[styles.thinkDot, { opacity: dotOpacity, marginLeft: 5 }]}
-                  />
-                  <Animated.View
-                    style={[styles.thinkDot, { opacity: dotOpacity, marginLeft: 5 }]}
-                  />
+                  <Animated.View style={[styles.thinkDot, { opacity: dotOpacity, marginLeft: 5 }]} />
+                  <Animated.View style={[styles.thinkDot, { opacity: dotOpacity, marginLeft: 5 }]} />
                 </View>
               </View>
             </View>
@@ -351,54 +413,49 @@ export default function AIScreen({ navigation }) {
         ]}
       >
         <View style={styles.inputRow}>
-          <TextInput
+          <RNTextInput
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Ask me anything about your new home..."
+            placeholder={t('ai.placeholder')}
             placeholderTextColor={COLORS.textTertiary}
             multiline
             maxLength={500}
             onSubmitEditing={() => handleSend()}
             blurOnSubmit
+            selectionColor={COLORS.primary}
           />
           <TouchableOpacity
             style={[styles.sendBtn, (!input.trim() || isThinking) && styles.sendBtnDisabled]}
             onPress={() => handleSend()}
             disabled={!input.trim() || isThinking}
+            activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={GRADIENTS.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sendGradient}
-            >
-              <Ionicons name="arrow-up" size={20} color={COLORS.white} />
-            </LinearGradient>
+            <Ionicons name="arrow-up" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
-        <Text style={styles.disclaimer}>
+        <Text variant="small" color="muted" align="center" style={styles.disclaimer}>
           Naero AI can make mistakes. Verify important information.
         </Text>
       </View>
-      {showDebug && (
+
+      {__DEV__ && showDebug && (
         <View style={styles.debugOverlay}>
-          <Text style={styles.debugTitle}>Naero AI Debug</Text>
-          <Text style={styles.debugText}>Source: {debugInfo.source || 'idle'}</Text>
-          <Text style={styles.debugText}>Provider: {debugInfo.provider || '-'}</Text>
-          <Text style={styles.debugText}>Model: {debugInfo.model}</Text>
-          <Text style={styles.debugText}>RAG: {debugInfo.ragEnabled ? 'ON' : 'OFF'}</Text>
-          <Text style={styles.debugText}>Time: {debugInfo.time || '-'}</Text>
-          <Text style={styles.debugText}>Messages: {messages.length}</Text>
-          {debugInfo.method && <Text style={styles.debugText}>Req: {debugInfo.method} {debugInfo.url}</Text>}
-          {debugInfo.statusCode && <Text style={styles.debugText}>Status: {debugInfo.statusCode}</Text>}
-          {debugInfo.responseBody && <Text style={[styles.debugText, { color: COLORS.warning }]}>Response: {debugInfo.responseBody}</Text>}
-          {debugInfo.error && <Text style={[styles.debugText, { color: COLORS.error }]}>Error: {debugInfo.error}</Text>}
-          <TouchableOpacity
-            onPress={() => setShowDebug(false)}
-            style={styles.debugClose}
-          >
-            <Text style={{ color: COLORS.textPrimary, fontWeight: '700' }}>Close</Text>
+          <Text variant="smallBold" color="brand" style={styles.debugTitle}>
+            Naero AI Debug
+          </Text>
+          <Text variant="small" color="secondary">Source: {debugInfo.source || 'idle'}</Text>
+          <Text variant="small" color="secondary">Provider: {debugInfo.provider || '-'}</Text>
+          <Text variant="small" color="secondary">Model: {debugInfo.model}</Text>
+          <Text variant="small" color="secondary">RAG: {debugInfo.ragEnabled ? 'ON' : 'OFF'}</Text>
+          <Text variant="small" color="secondary">Time: {debugInfo.time || '-'}</Text>
+          <Text variant="small" color="secondary">Messages: {messages.length}</Text>
+          {debugInfo.method && <Text variant="small" color="secondary">Req: {debugInfo.method} {debugInfo.url}</Text>}
+          {debugInfo.statusCode && <Text variant="small" color="secondary">Status: {debugInfo.statusCode}</Text>}
+          {debugInfo.responseBody && <Text variant="small" color="warning">Response: {debugInfo.responseBody}</Text>}
+          {debugInfo.error && <Text variant="small" color="error">Error: {debugInfo.error}</Text>}
+          <TouchableOpacity onPress={() => setShowDebug(false)} style={styles.debugClose}>
+            <Text variant="captionBold" color="primary">Close</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -413,23 +470,16 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
+    backgroundColor: COLORS.bg,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   headerAvatar: {
     position: 'relative',
@@ -439,20 +489,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.success,
+    borderWidth: 1.5,
     borderColor: COLORS.bg,
-  },
-  headerTitle: {
-    ...FONTS.h3,
-    color: COLORS.textPrimary,
-  },
-  headerSub: {
-    ...FONTS.caption,
-    color: COLORS.textSecondary,
-    marginTop: 1,
   },
 
   welcomeList: {
@@ -462,28 +504,67 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.xxl,
   },
-  mascotSection: {
+  welcomeLogoWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '20',
   },
   welcomeTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    letterSpacing: -0.5,
+    marginBottom: 4,
   },
   welcomeSub: {
-    ...FONTS.body,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-    textAlign: 'center',
     paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.xxl,
   },
+
+  suggestedSection: {
+    width: '100%',
+    marginBottom: SPACING.xl,
+  },
+  suggestedLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+  },
+  suggestedGrid: {
+    gap: SPACING.sm,
+  },
+  suggestedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.card,
+    gap: SPACING.md,
+  },
+  suggestedChipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  suggestedChipText: {
+    flex: 1,
+  },
+
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: SPACING.xl,
+    marginBottom: SPACING.lg,
     width: '100%',
     gap: SPACING.md,
   },
@@ -492,28 +573,43 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.cardBorder,
   },
-  dividerText: {
-    ...FONTS.caption,
-    color: COLORS.textTertiary,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
+
   ragToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
     width: '100%',
   },
-  ragToggleLabel: {
-    ...FONTS.body,
-    color: COLORS.textPrimary,
+  ragToggleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ragToggleSwitch: {
+    width: 40,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.cardBorder,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  ragToggleSwitchActive: {
+    backgroundColor: COLORS.primary + '40',
+  },
+  ragToggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.textTertiary,
+  },
+  ragToggleThumbActive: {
+    backgroundColor: COLORS.primary,
+    alignSelf: 'flex-end',
   },
 
   quickGrid: {
@@ -524,20 +620,20 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xxl,
   },
   quickChip: {
-    width: (width - SPACING.xl * 2 - SPACING.sm) / 2 - SPACING.sm / 2,
-  },
-  quickChipInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.card,
+    minWidth: 140,
+    justifyContent: 'center',
   },
   quickChipLabel: {
-    ...FONTS.captionBold,
+    fontWeight: '500',
   },
 
   chatList: {
@@ -555,6 +651,9 @@ const styles = StyleSheet.create({
   userRow: {
     alignSelf: 'flex-end',
   },
+  messageContent: {
+    flex: 1,
+  },
   aiAvatarSm: {
     width: 28,
     height: 28,
@@ -565,9 +664,11 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
     marginTop: 2,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '20',
   },
   messageBubble: {
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
   },
@@ -578,30 +679,33 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
   },
   userBubble: {
-    backgroundColor: COLORS.primary + '18',
+    backgroundColor: COLORS.primary + '10',
     borderTopRightRadius: 4,
     borderWidth: 1,
-    borderColor: COLORS.primary + '25',
+    borderColor: COLORS.primary + '20',
   },
-  messageText: {
-    ...FONTS.body,
-    color: COLORS.textPrimary,
-    lineHeight: 22,
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+    marginLeft: 2,
+    gap: 4,
   },
-  userText: {
-    color: COLORS.textPrimary,
+  sourceBadgeText: {
+    fontSize: 10,
+    letterSpacing: 0.3,
   },
 
   thinkingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 2,
   },
   thinkDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: COLORS.primary,
   },
 
@@ -620,7 +724,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
+    borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     maxHeight: 100,
@@ -633,26 +737,17 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: RADIUS.full,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
-  sendGradient: {
-    width: 42,
-    height: 42,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    ...SHADOWS.glow,
+  },
+  sendBtnDisabled: {
+    opacity: 0.4,
   },
   disclaimer: {
-    ...FONTS.small,
-    color: COLORS.textMuted,
-    textAlign: 'center',
     marginTop: SPACING.sm,
+    marginBottom: 2,
   },
   debugOverlay: {
     position: 'absolute',
@@ -660,27 +755,18 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     backgroundColor: 'rgba(0,0,0,0.92)',
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.primary + '50',
+    borderColor: COLORS.primary + '40',
     zIndex: 1000,
     elevation: 20,
+    gap: 3,
   },
   debugTitle: {
-    color: COLORS.primary,
-    fontWeight: '800',
-    fontSize: 14,
-    marginBottom: 8,
-    letterSpacing: 1,
+    marginBottom: 6,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-  },
-  debugText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontFamily: 'monospace',
-    marginBottom: 4,
-    lineHeight: 18,
   },
   debugClose: {
     marginTop: SPACING.sm,

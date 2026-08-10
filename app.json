@@ -17,6 +17,7 @@
         "projectId": "1d848be5-90a9-467d-a670-1841606fe59c"
       }
     },
+    "scheme": "naeroapp",
     "owner": "salemnjimgold",
     "android": {
       "package": "com.salemnjimgold.naeroapp",
@@ -24,6 +25,19 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       }
-    }
+    },
+    "plugins": [
+      "expo-web-browser",
+      ["expo-location", {
+        "locationWhenInUsePermission": "Naero uses your location while the app is open to select your city and improve nearby results.",
+        "isAndroidBackgroundLocationEnabled": false
+      }],
+      ["react-native-fbsdk-next", {
+        "appID": "4692597234400451",
+        "clientToken": "84c58a46e9f8e6540df517df8df11b1c",
+        "displayName": "Naero",
+        "scheme": "fb4692597234400451"
+      }]
+    ]
   }
 }

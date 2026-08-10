@@ -79,7 +79,7 @@ export default function ExploreScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+        colors={['rgba(59,130,246,0.06)', COLORS.bg]}
         style={[styles.header, { paddingTop: insets.top + SPACING.md }]}
       >
         <Text style={styles.title}>{t('explore.title')}</Text>

@@ -5,8 +5,7 @@
   },
   "nav": {
     "home": "Accueil",
-    "explore": "Explorer",
-    "services": "Services",
+    "discover": "Découvrir",
     "community": "Communauté",
     "profile": "Profil"
   },
@@ -147,6 +146,48 @@
     "ar": "العربية",
     "fr": "Français",
     "hu": "Magyar"
+  },
+  "hub": {
+    "greetingMorning": "Bonjour",
+    "greetingAfternoon": "Bon après-midi",
+    "greetingEvening": "Bonsoir",
+    "greetingNight": "Bonne nuit",
+    "heroTagline": "Votre voyage continue ici.",
+    "aiTitle": "Comment puis-je vous aider ?",
+    "aiSubtitle": "Demandez tout sur votre installation",
+    "askNaero": "Demandez à Naero...",
+    "journeyTitle": "Votre Voyage",
+    "journeyStageArrived": "Arrivé",
+    "journeyStageSettling": "Installation",
+    "journeyStageThriving": "Épanouissement",
+    "journeyStageConnected": "Connecté",
+    "journeyProgress": "{{percent}}% complété",
+    "nextStepTitle": "Votre prochaine étape",
+    "nextStepSubtitle": "Basé sur votre parcours",
+    "nextStepBank": "Ouvrir un compte bancaire",
+    "nextStepBankDesc": "La plupart des nouveaux arrivants le font la première semaine",
+    "nearbyEssentials": "Essentiels à proximité",
+    "communityPulse": "Pulse communautaire",
+    "communityPulseLive": "En direct",
+    "communityPulseDesc": "{{count}} personnes cherchent de l'aide près de chez vous",
+    "askAI": "Demander à Naero",
+    "chips": {
+      "residence": "Résidence",
+      "jobs": "Emplois",
+      "housing": "Logement",
+      "translate": "Traduire",
+      "healthcare": "Santé",
+      "nearby": "À proximité",
+      "documents": "Documents",
+      "emergency": "Urgence"
+    },
+    "essentials": {
+      "hospital": "Hôpital",
+      "food": "Nourriture",
+      "sim": "Carte SIM",
+      "bank": "Banque",
+      "police": "Police"
+    }
   },
   "common": {
     "loading": "Chargement...",

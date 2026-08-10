@@ -1,20 +1,20 @@
 import React from 'react';
-import { Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { Platform, View } from 'react-native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, FONTS, DEPTH, ACCENT, TEXT, BORDER } from '../theme';
 
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import AuthScreen from '../screens/AuthScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import HomeScreen from '../screens/HomeScreen';
-import ExploreScreen from '../screens/ExploreScreen';
-import ServicesScreen from '../screens/ServicesScreen';
+import DiscoverScreen from '../screens/DiscoverScreen';
 import CommunityScreen from '../screens/CommunityScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import JobsScreen from '../screens/JobsScreen';
@@ -45,50 +45,69 @@ function TabNavigator() {
             case 'Home':
               iconName = focused ? 'home' : 'home-outline';
               break;
-            case 'Explore':
-              iconName = focused ? 'compass' : 'compass-outline';
+            case 'World':
+              iconName = focused ? 'globe' : 'globe-outline';
               break;
-            case 'Services':
-              iconName = focused ? 'grid' : 'grid-outline';
-              break;
-            case 'Community':
+            case 'People':
               iconName = focused ? 'people' : 'people-outline';
-              break;
-            case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
               break;
             default:
               iconName = 'ellipse';
           }
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={22} color={color} />;
         },
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textTertiary,
+        tabBarActiveTintColor: ACCENT.primary,
+        tabBarInactiveTintColor: TEXT.tertiary,
         tabBarLabelStyle: {
           ...FONTS.tab,
         },
         tabBarStyle: {
-          borderTopColor: COLORS.cardBorder,
-          backgroundColor: COLORS.card,
-          height: Platform.OS === 'ios' ? 85 : 56 + insets.bottom,
-          paddingTop: 6,
-          paddingBottom: Platform.OS === 'ios' ? 25 : insets.bottom,
+          backgroundColor: DEPTH.canvas,
+          borderTopColor: BORDER.subtle,
           borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 80 : 56 + insets.bottom,
+          paddingTop: 6,
+          paddingBottom: Platform.OS === 'ios' ? 24 : insets.bottom,
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: t('nav.home') }} />
-      <Tab.Screen name="Explore" component={ExploreScreen} options={{ tabBarLabel: t('nav.explore') }} />
-      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: t('nav.services') }} />
-      <Tab.Screen name="Community" component={CommunityScreen} options={{ tabBarLabel: t('nav.community') }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: t('nav.profile') }} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ tabBarLabel: t('nav.home') }}
+        listeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}
+      />
+      <Tab.Screen
+        name="World"
+        component={DiscoverScreen}
+        options={{ tabBarLabel: t('nav.world') }}
+        listeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}
+      />
+      <Tab.Screen
+        name="People"
+        component={CommunityScreen}
+        options={{ tabBarLabel: t('nav.people') }}
+        listeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}
+      />
     </Tab.Navigator>
   );
 }
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={{
+      ...DarkTheme,
+      dark: true,
+      colors: {
+        ...DarkTheme.colors,
+        primary: ACCENT.primary,
+        background: DEPTH.canvas,
+        card: DEPTH.surface,
+        text: TEXT.primary,
+        border: BORDER.subtle,
+        notification: ACCENT.primary,
+      },
+    }}>
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
         initialRouteName="Splash"
@@ -96,12 +115,12 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Splash"
           component={SplashScreen}
-          options={{ animation: 'fade' }}
+          options={{ animation: 'fade',           contentStyle: { backgroundColor: DEPTH.canvas } }}
         />
         <Stack.Screen
           name="Welcome"
           component={WelcomeScreen}
-          options={{ animation: 'fade' }}
+          options={{ animation: 'fade', contentStyle: { backgroundColor: DEPTH.canvas } }}
         />
         <Stack.Screen
           name="Auth"
@@ -166,6 +185,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Notifications"
           component={NotificationsScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

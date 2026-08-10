@@ -3,7 +3,16 @@ import { I18nManager, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AIEngine } from '../ai/engine';
 import { loadProfile } from '../ai/memory';
-import { requestLocationPermission, getCurrentPosition, getUserLocation, getLocationPermissionStatus, geocodeLocation, hasLocationPermission, refreshUserLocation } from '../services/locationService';
+import {
+  initializeLocation,
+  requestForegroundLocation,
+  refreshLocationState,
+  setManualLocation,
+  disableLocationUse,
+  clearStoredLocationData,
+  startSignificantLocationUpdates,
+  stopSignificantLocationUpdates,
+} from '../services/locationService';
 import {
   placeService, jobService, serviceService, housingService, communityService,
   safetyTipService, emergencyContactService,
@@ -30,7 +39,11 @@ const initialState = {
   isOnboarded: false,
   aiProfile: null,
   userLocation: null,
+  locationState: null,
+  locationPreference: 'auto',
   locationPermissionStatus: 'undetermined',
+  locationServicesEnabled: null,
+  locationError: null,
   userCity: null,
   locationLoading: false,
   dataLoading: false,
@@ -87,6 +100,27 @@ function appReducer(state, action) {
       return { ...state, locationPermissionStatus: action.payload };
     case 'SET_USER_CITY':
       return { ...state, userCity: action.payload };
+    case 'SET_LOCATION_STATE': {
+      const result = action.payload;
+      const snapshot = result.snapshot || null;
+      return {
+        ...state,
+        locationState: snapshot,
+        locationPreference: result.preference || 'auto',
+        locationPermissionStatus: result.permissionStatus || 'undetermined',
+        locationServicesEnabled: result.servicesEnabled,
+        locationError: result.error || null,
+        userLocation: snapshot && snapshot.latitude !== null && snapshot.longitude !== null
+          ? {
+            latitude: snapshot.latitude,
+            longitude: snapshot.longitude,
+            accuracy: snapshot.accuracy,
+            timestamp: snapshot.timestamp,
+          }
+          : null,
+        userCity: snapshot?.address?.city || null,
+      };
+    }
     case 'SET_LOCATION_LOADING':
       return { ...state, locationLoading: action.payload };
     case 'SET_DATA_LOADING':
@@ -146,6 +180,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     loadStoredData();
+    initializeLocationState();
     initAI();
     initSync();
     loadRealtimePref();
@@ -155,6 +190,25 @@ export function AppProvider({ children }) {
       if (cleanupRef.current) cleanupRef.current();
     };
   }, []);
+
+  useEffect(() => {
+    if (state.locationPreference !== 'auto' || state.locationPermissionStatus !== 'granted') {
+      stopSignificantLocationUpdates();
+      return undefined;
+    }
+    let disposed = false;
+    let stop = () => {};
+    startSignificantLocationUpdates((result) => {
+      if (!disposed) dispatch({ type: 'SET_LOCATION_STATE', payload: result });
+    }).then((unsubscribe) => {
+      if (disposed) unsubscribe();
+      else stop = unsubscribe;
+    });
+    return () => {
+      disposed = true;
+      stop();
+    };
+  }, [state.locationPreference, state.locationPermissionStatus]);
 
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEYS.LANGUAGE, state.language);
@@ -256,6 +310,11 @@ export function AppProvider({ children }) {
     } catch {}
   }
 
+  async function initializeLocationState() {
+    const result = await initializeLocation();
+    dispatch({ type: 'SET_LOCATION_STATE', payload: result });
+  }
+
   const setLanguage = useCallback((lang) => {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
   }, []);
@@ -280,43 +339,52 @@ export function AppProvider({ children }) {
 
   const requestLocationPermissionAction = useCallback(async () => {
     dispatch({ type: 'SET_LOCATION_LOADING', payload: true });
-    const granted = await requestLocationPermission();
-    if (granted) {
-      dispatch({ type: 'SET_LOCATION_PERMISSION', payload: 'granted' });
-      const loc = await getCurrentPosition();
-      if (loc) {
-        dispatch({ type: 'SET_USER_LOCATION', payload: loc });
-        const city = await geocodeLocation(loc.latitude, loc.longitude);
-        if (city) dispatch({ type: 'SET_USER_CITY', payload: city });
-      }
-    } else {
-      dispatch({ type: 'SET_LOCATION_PERMISSION', payload: 'denied' });
-    }
+    const result = await requestForegroundLocation();
+    dispatch({ type: 'SET_LOCATION_STATE', payload: result });
     dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
+    return result;
   }, []);
 
   const refreshLocation = useCallback(async () => {
-    const hasPerm = await hasLocationPermission();
-    if (!hasPerm) {
-      dispatch({ type: 'SET_LOCATION_PERMISSION', payload: 'denied' });
-      return;
-    }
     dispatch({ type: 'SET_LOCATION_LOADING', payload: true });
-    const loc = await refreshUserLocation();
-    if (loc) {
-      dispatch({ type: 'SET_USER_LOCATION', payload: loc });
-      const city = await geocodeLocation(loc.latitude, loc.longitude);
-      if (city) dispatch({ type: 'SET_USER_CITY', payload: city });
-    }
+    const result = await refreshLocationState();
+    dispatch({ type: 'SET_LOCATION_STATE', payload: result });
     dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
+    return result;
   }, []);
 
-  const loadNearbyData = useCallback(async (city) => {
+  const selectManualCity = useCallback(async (city) => {
+    dispatch({ type: 'SET_LOCATION_LOADING', payload: true });
+    const result = await setManualLocation(city);
+    dispatch({ type: 'SET_LOCATION_STATE', payload: result });
+    dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
+    return result;
+  }, []);
+
+  const disableLocation = useCallback(async () => {
+    dispatch({ type: 'SET_LOCATION_LOADING', payload: true });
+    const result = await disableLocationUse();
+    dispatch({ type: 'SET_LOCATION_STATE', payload: result });
+    dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
+    return result;
+  }, []);
+
+  const clearLocationData = useCallback(async () => {
+    dispatch({ type: 'SET_LOCATION_LOADING', payload: true });
+    const result = await clearStoredLocationData();
+    dispatch({ type: 'SET_LOCATION_STATE', payload: result });
+    dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
+    return result;
+  }, []);
+
+  const loadNearbyData = useCallback(async (city, coordinates) => {
     if (!city) return;
     dispatch({ type: 'SET_DATA_LOADING', payload: true });
     try {
       const [places, services, alerts, jobs] = await Promise.all([
-        placeService.getByCity(city),
+        coordinates
+          ? placeService.getNearby(coordinates.latitude, coordinates.longitude, 10, 20, 'hospital')
+          : Promise.resolve({ data: [], error: { code: 'LOCATION_REQUIRED', message: 'Resolved coordinates are required.' } }),
         serviceService.getByCity(city),
         communityService.getAlerts(city),
         jobService.getByCity(city),
@@ -333,29 +401,10 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const status = await getLocationPermissionStatus();
-        dispatch({ type: 'SET_LOCATION_PERMISSION', payload: status });
-        if (status === 'granted') {
-          const loc = await getUserLocation();
-          if (loc) {
-            dispatch({ type: 'SET_USER_LOCATION', payload: loc });
-            const city = await geocodeLocation(loc.latitude, loc.longitude);
-            if (city) {
-              dispatch({ type: 'SET_USER_CITY', payload: city });
-            }
-          }
-        }
-      } catch {}
-    })();
-  }, []);
-
-  useEffect(() => {
     if (state.userCity) {
-      loadNearbyData(state.userCity);
+      loadNearbyData(state.userCity, state.userLocation);
     }
-  }, [state.userCity]);
+  }, [state.userCity, state.userLocation]);
 
   const triggerSync = useCallback(async () => {
     dispatch({ type: 'SET_IS_SYNCING', payload: true });
@@ -429,7 +478,11 @@ export function AppProvider({ children }) {
         getAIEngine,
         requestLocationPermission: requestLocationPermissionAction,
         refreshLocation,
-        hasLocationPermission: state.locationPermissionStatus === 'granted',
+        selectManualCity,
+        disableLocation,
+        clearLocationData,
+        hasLocationPermission: Boolean(state.locationState),
+        hasDeviceLocationPermission: state.locationPermissionStatus === 'granted',
         triggerSync,
         toggleRealtime,
         fetchLiveNearby,

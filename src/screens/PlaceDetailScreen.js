@@ -12,8 +12,9 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import * as Haptics from 'expo-haptics';
 
 const LOGO_PLACEHOLDER = require('../../assets/branding/naero-logo.png');
 
@@ -31,12 +32,14 @@ export default function PlaceDetailScreen({ route, navigation }) {
       : null;
 
   const handleCall = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     if (item.phone) {
       Linking.openURL(`tel:${item.phone.replace(/[^+\d]/g, '')}`);
     }
   };
 
   const handleDirections = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(item.address)}`);
   };
 
@@ -260,7 +263,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   tag: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     borderRadius: RADIUS.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -349,7 +352,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: 'rgba(6,182,212,0.1)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING.lg,
     borderWidth: 1,

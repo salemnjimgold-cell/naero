@@ -12,7 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, ACCENT, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { CommunityCard } from '../components/ListingCard';
 import { EmptyState } from '../components/EmptyState';
@@ -38,13 +39,14 @@ export default function CommunityScreen({ navigation }) {
   }
 
   const handlePostPress = useCallback((item) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     navigation.navigate('CommunityDetail', { item });
   }, [navigation]);
 
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+        colors={['rgba(59,130,246,0.06)', COLORS.bg]}
         style={[styles.header, { paddingTop: insets.top + SPACING.md }]}
       >
         <View style={styles.headerRow}>
@@ -56,11 +58,13 @@ export default function CommunityScreen({ navigation }) {
         </View>
       </LinearGradient>
 
-      <TouchableOpacity style={styles.createPost} activeOpacity={0.7}>
-        <Image source={LOGO} style={{ width: 30, height: 30 }} resizeMode="contain" />
+      <TouchableOpacity style={styles.createPost} activeOpacity={0.7} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})}>
+        <View style={styles.createPostAvatar}>
+          <Image source={LOGO} style={{ width: 24, height: 24 }} resizeMode="contain" />
+        </View>
         <Text style={styles.createPostText}>{t('community.writePost')}</Text>
         <View style={styles.createPostBtn}>
-          <Ionicons name="add-circle" size={28} color={COLORS.primary} />
+          <Ionicons name="add" size={20} color={COLORS.white} />
         </View>
       </TouchableOpacity>
 
@@ -120,12 +124,27 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     gap: SPACING.md,
   },
+  createPostAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: RADIUS.full,
+    backgroundColor: ACCENT.soft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   createPostText: {
     flex: 1,
     ...FONTS.body,
     color: COLORS.textTertiary,
   },
-  createPostBtn: {},
+  createPostBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: RADIUS.full,
+    backgroundColor: ACCENT.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   list: {
     paddingHorizontal: SPACING.xl,
   },

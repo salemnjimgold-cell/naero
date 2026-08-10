@@ -15,7 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { signInWithEmail, createAccount, requestPasswordReset, trackAuth } from '../services';
 
 const OAUTH_ENABLED = process.env.EXPO_PUBLIC_OAUTH_ENABLED === 'true';
@@ -35,6 +36,7 @@ export default function AuthScreen({ navigation }) {
   const handleSubmit = useCallback(async () => {
     setError(null);
     setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     trackAuth(mode === 'login' ? 'sign_in' : 'sign_up');
 
     try {
@@ -123,7 +125,7 @@ export default function AuthScreen({ navigation }) {
           <View style={styles.tabRow}>
             <TouchableOpacity
               style={[styles.tab, mode === 'login' && styles.tabActive]}
-              onPress={() => { setMode('login'); setError(null); }}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); setMode('login'); setError(null); }}
             >
               <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
                 Sign In
@@ -131,7 +133,7 @@ export default function AuthScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, mode === 'signup' && styles.tabActive]}
-              onPress={() => { setMode('signup'); setError(null); }}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); setMode('signup'); setError(null); }}
             >
               <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>
                 Sign Up
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.lg,
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BORDER.ghost,
     borderRadius: RADIUS.full,
     padding: 4,
     marginBottom: SPACING.xxxl,
@@ -365,7 +367,7 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BORDER.ghost,
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     height: 52,
@@ -436,7 +438,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BORDER.ghost,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
+import { COLORS, BORDER, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
 
 const PLACEHOLDER_LOGO = require('../../assets/branding/naero-logo.png');
 
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tag: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,

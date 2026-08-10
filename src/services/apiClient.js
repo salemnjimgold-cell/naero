@@ -1,14 +1,7 @@
 import { API_BASE_URL, API_TIMEOUT_MS, isRemoteApiEnabled } from '../config/api';
+const { ApiError, normalizeApiFailure, createRequestId } = require('./apiClientCore');
 
-export class ApiError extends Error {
-  constructor(message, { status = 0, code = 'API_ERROR', data = null } = {}) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.code = code;
-    this.data = data;
-  }
-}
+export { ApiError };
 
 function normalizePath(path) {
   return path.startsWith('/') ? path : `/${path}`;
@@ -25,13 +18,21 @@ export function createApiClient({ baseUrl = API_BASE_URL, timeoutMs = API_TIMEOU
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || timeoutMs);
+    let didTimeout = false;
+    const timeout = setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, options.timeoutMs || timeoutMs);
+    const abortFromCaller = () => controller.abort();
+    options.signal?.addEventListener?.('abort', abortFromCaller, { once: true });
+    const requestId = options.requestId || createRequestId();
 
     try {
       const headers = {
         accept: 'application/json',
         ...(options.body ? { 'content-type': 'application/json' } : {}),
         ...(options.authToken ? { authorization: `Bearer ${options.authToken}` } : {}),
+        'x-request-id': requestId,
         ...(options.headers || {}),
       };
 
@@ -57,16 +58,23 @@ export function createApiClient({ baseUrl = API_BASE_URL, timeoutMs = API_TIMEOU
         data: payload?.data ?? payload,
         error: null,
         status: response.status,
+        meta: payload?.meta || null,
+        requestId: response.headers?.get?.('x-request-id') || payload?.meta?.requestId || requestId,
       };
     } catch (error) {
-      const code = error.name === 'AbortError' ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR';
+      const normalized = normalizeApiFailure(error);
       return {
         data: null,
-        error: { code, message: error.message },
+        error: {
+          ...normalized,
+          code: didTimeout ? 'REQUEST_TIMEOUT' : (options.signal?.aborted ? 'REQUEST_CANCELLED' : normalized.code),
+        },
         status: 0,
+        requestId,
       };
     } finally {
       clearTimeout(timeout);
+      options.signal?.removeEventListener?.('abort', abortFromCaller);
     }
   }
 
@@ -74,6 +82,7 @@ export function createApiClient({ baseUrl = API_BASE_URL, timeoutMs = API_TIMEOU
     request,
     get: (path, options) => request(path, { ...options, method: 'GET' }),
     put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
+    post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
   };
 }
 
