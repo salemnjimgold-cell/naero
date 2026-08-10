@@ -1,8 +1,10 @@
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { placesCache, servicesCache, jobsCache, housingCache, communityCache, safetyCache } from './cacheService';
+const { createSyncStorage } = require('./syncStorageCore');
 
 const SYNC_INTERVAL_MS = 15 * 60 * 1000;
-const SYNC_KEY = '@naero_last_sync';
+const syncStorage = createSyncStorage(AsyncStorage);
 
 let syncTimer = null;
 let appStateSubscription = null;
@@ -66,28 +68,16 @@ export function stopBackgroundSync() {
 }
 
 export async function getLastSyncTime() {
-  try {
-    const { AsyncStorage } = require('@react-native-async-storage/async-storage');
-    const raw = await AsyncStorage.getItem(SYNC_KEY);
-    return raw ? parseInt(raw, 10) : null;
-  } catch {
-    return null;
-  }
+  return syncStorage.getLastSyncTime();
 }
 
 async function _persistSyncTime() {
-  try {
-    const { AsyncStorage } = require('@react-native-async-storage/async-storage');
-    await AsyncStorage.setItem(SYNC_KEY, String(Date.now()));
-  } catch {}
+  return syncStorage.persistSyncTime();
 }
 
 export async function clearSyncState() {
   stopBackgroundSync();
-  try {
-    const { AsyncStorage } = require('@react-native-async-storage/async-storage');
-    await AsyncStorage.removeItem(SYNC_KEY);
-  } catch {}
+  await syncStorage.clearSyncTime();
 }
 
 export function isSyncInProgress() {
