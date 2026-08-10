@@ -1,7 +1,6 @@
 import React from 'react';
 import { I18nManager, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '../../theme/ThemeModeContext';
 import Text from '../Text';
 
