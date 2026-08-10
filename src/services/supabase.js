@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config/api';
+import { supabaseAuthStorage } from './secureAuthStorage';
 
 let supabaseInstance = null;
 
@@ -12,6 +13,7 @@ export function getSupabaseClient() {
     supabaseInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
+        storage: supabaseAuthStorage,
         detectSessionInUrl: false,
         autoRefreshToken: true,
       },

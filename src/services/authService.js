@@ -15,7 +15,6 @@ function serializeSession(supabaseSession) {
     mode: 'authenticated',
     provider: 'supabase',
     accessToken: supabaseSession.access_token,
-    refreshToken: supabaseSession.refresh_token,
     user: supabaseSession.user ? {
       id: supabaseSession.user.id,
       email: supabaseSession.user.email,
@@ -33,7 +32,6 @@ function serializeGuestSession() {
     mode: 'guest',
     provider: 'guest',
     accessToken: null,
-    refreshToken: null,
     user: {
       id: 'guest',
       uid: 'guest',
@@ -54,13 +52,19 @@ export async function getAuthSession() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const serialized = serializeSession(session);
-        await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(serialized));
+        await AsyncStorage.removeItem(AUTH_SESSION_KEY);
         naeroApi.setToken(session.access_token);
         return serialized;
       }
     }
     const raw = await AsyncStorage.getItem(AUTH_SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const stored = JSON.parse(raw);
+    if (stored?.mode !== 'guest') {
+      await AsyncStorage.removeItem(AUTH_SESSION_KEY);
+      return null;
+    }
+    return stored;
   } catch {
     return null;
   }
@@ -82,7 +86,7 @@ export async function signInWithEmail(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { user: null, session: null, error: error.message };
     const session = serializeSession(data.session);
-    await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    await AsyncStorage.removeItem(AUTH_SESSION_KEY);
     naeroApi.setToken(data.session.access_token);
     return { user: session.user, session, error: null };
   } catch (err) {
@@ -106,7 +110,7 @@ export async function createAccount(email, password, displayName) {
     if (error) return { user: null, session: null, error: error.message };
     const session = data.session ? serializeSession(data.session) : null;
     if (session) {
-      await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      await AsyncStorage.removeItem(AUTH_SESSION_KEY);
       naeroApi.setToken(data.session.access_token);
     }
     return { user: data.user, session, error: null };
@@ -152,7 +156,7 @@ function parseUrlParams(urlString) {
 export async function saveOAuthSession(supabaseSession, provider) {
   const session = serializeSession(supabaseSession);
   session.provider = provider;
-  await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  await AsyncStorage.removeItem(AUTH_SESSION_KEY);
   naeroApi.setToken(supabaseSession.access_token);
 
   try {
@@ -184,8 +188,6 @@ export async function signInWithOAuth(provider) {
       apple: 'email',
     };
 
-    console.warn('[OAuth] Provider:', provider, 'Redirect:', OAUTH_REDIRECT);
-
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: OAUTH_REDIRECT, scopes: providerScopes[provider] || 'email' },
@@ -196,7 +198,6 @@ export async function signInWithOAuth(provider) {
       if (msg.includes('not enabled') || msg.includes('unsupported') || msg.includes('not configured')) {
         return { session: null, user: null, error: 'This sign-in method is coming soon.' };
       }
-      console.warn('[OAuth] signInWithOAuth error:', error.message);
       return { session: null, user: null, error: error.message };
     }
 
@@ -208,14 +209,11 @@ export async function signInWithOAuth(provider) {
     let linkingUrl = null;
     const linkingSub = Linking.addEventListener('url', (event) => {
       if (event.url && !linkingUrl) {
-        console.warn('[OAuth] Linking captured URL:', event.url);
         linkingUrl = event.url;
       }
     });
 
-    console.warn('[OAuth] Opening WebBrowser...');
     const result = await WebBrowser.openAuthSessionAsync(data.url, OAUTH_REDIRECT);
-    console.warn('[OAuth] Result type:', result.type, 'URL:', result.url);
 
     // Small delay for any late Linking event
     if (!result.url) {
@@ -227,33 +225,26 @@ export async function signInWithOAuth(provider) {
     const callbackUrl = linkingUrl || (result.type === 'success' && result.url) || null;
 
     if (!callbackUrl) {
-      console.warn('[OAuth] No callback URL from WebBrowser or Linking');
       if (result.type === 'success') {
         return { session: null, user: null, error: 'Authentication failed. No code received.' };
       }
       return { session: null, user: null, error: null };
     }
 
-    console.warn('[OAuth] Full callback URL:', callbackUrl);
-
     const params = parseUrlParams(callbackUrl);
-    console.warn('[OAuth] Parsed params:', JSON.stringify(params));
 
     if (params.error) {
       const msg = params.error_description || params.error;
-      console.warn('[OAuth] Error in callback:', msg);
       return { session: null, user: null, error: msg };
     }
 
     if (params.code) {
-      console.warn('[OAuth] Exchanging code for session...');
       const { data: sd, error: exError } = await supabase.auth.exchangeCodeForSession(params.code);
       if (exError) {
         const msg = exError.message.toLowerCase();
         if (msg.includes('not enabled') || msg.includes('unsupported') || msg.includes('not configured')) {
           return { session: null, user: null, error: 'This sign-in method is coming soon.' };
         }
-        console.warn('[OAuth] Code exchange error:', exError.message);
         return { session: null, user: null, error: exError.message };
       }
       if (!sd?.session) return { session: null, user: null, error: 'No session returned.' };
@@ -261,23 +252,19 @@ export async function signInWithOAuth(provider) {
     }
 
     if (params.access_token) {
-      console.warn('[OAuth] Setting session from tokens...');
       const { data: sd, error: setError } = await supabase.auth.setSession({
         access_token: params.access_token,
         refresh_token: params.refresh_token || '',
       });
       if (setError) {
-        console.warn('[OAuth] setSession error:', setError.message);
         return { session: null, user: null, error: setError.message };
       }
       if (!sd?.session) return { session: null, user: null, error: 'No session returned.' };
       return await saveOAuthSession(sd.session, provider);
     }
 
-    console.warn('[OAuth] No code, tokens, or error in callback URL');
     return { session: null, user: null, error: 'Authentication failed. No code received.' };
   } catch (err) {
-    console.warn('[OAuth] Exception:', err.message);
     return { session: null, user: null, error: err.message || 'Authentication failed.' };
   }
 }
