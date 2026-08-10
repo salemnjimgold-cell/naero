@@ -5,16 +5,19 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { AppProvider } from './src/context/AppContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import { ThemeModeProvider } from './src/theme/ThemeModeContext';
 import './src/i18n';
 
 export default function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <AppProvider>
-          <AppNavigator />
-          <StatusBar style="light" />
-        </AppProvider>
+        <ThemeModeProvider>
+          <AppProvider>
+            <AppNavigator />
+            <StatusBar style="light" />
+          </AppProvider>
+        </ThemeModeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

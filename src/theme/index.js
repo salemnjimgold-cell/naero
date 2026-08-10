@@ -368,3 +368,16 @@ export const theme = {
   layout,
   hitSlop,
 };
+
+// Contextual Compass semantic foundations. Existing exports above remain as a
+// transitional Deep Sea compatibility layer until their consumers migrate.
+const contextualFoundations = require('./foundations');
+export const semanticThemes = contextualFoundations.THEMES;
+export const semanticTypography = contextualFoundations.TYPOGRAPHY;
+export const semanticSpacing = contextualFoundations.SPACING_SCALE;
+export const semanticRadius = contextualFoundations.RADIUS_SCALE;
+export const semanticBorders = contextualFoundations.BORDER_WIDTHS;
+export const semanticElevation = contextualFoundations.ELEVATION;
+export const touchTargets = contextualFoundations.TOUCH_TARGETS;
+export const iconSizes = contextualFoundations.ICON_SIZES;
+export const semanticMotion = contextualFoundations.MOTION_TOKENS;
