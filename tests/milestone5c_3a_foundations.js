@@ -68,5 +68,15 @@ test('touch, body text and reduced-motion foundations meet policy', () => {
   assert.deepStrictEqual([foundations.TYPOGRAPHY.body.fontSize, foundations.TYPOGRAPHY.body.lineHeight], [16, 24]);
   assert.strictEqual(foundations.MOTION_TOKENS.reduced.duration, 0);
 });
+test('legacy application shell and routes remain present behind the additive provider', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '../App.js'), 'utf8');
+  const navigator = fs.readFileSync(path.join(__dirname, '../src/navigation/AppNavigator.js'), 'utf8');
+  assert(app.includes('<ThemeModeProvider>') && app.includes('<AppProvider>') && app.includes('<AppNavigator />'));
+  for (const route of ['Home', 'World', 'People', 'Auth', 'LocationPermission', 'Main', 'AI', 'Profile']) {
+    assert(navigator.includes(`name="${route}"`), `${route} route missing`);
+  }
+});
 
-console.log(`Milestone 5C 3A foundations: ${passed}/10 passed`);
+console.log(`Milestone 5C 3A foundations: ${passed}/11 passed`);
