@@ -19,6 +19,7 @@
     "test:security:notifications": "node tests/milestone5b_notifications.js",
     "test:security:sync": "node tests/milestone5b_sync.js",
     "test:security:auth": "node tests/milestone5b_auth_storage.js",
+    "test:security:android": "node tests/milestone5b_android_security.js",
     "typecheck:location": "tsc -p jsconfig.location.json",
     "typecheck:nearby": "tsc -p jsconfig.nearby.json",
     "backend:dev": "powershell -ExecutionPolicy Bypass -File scripts/backend-dev.ps1",
