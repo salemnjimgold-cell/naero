@@ -16,6 +16,7 @@
     "test:nearby": "node tests/nearby_provider.js",
     "test:nearby:cities": "node tests/nearby_city_qa.js",
     "test:postgis": "node tests/postgis_verified_services.js",
+    "test:security:notifications": "node tests/milestone5b_notifications.js",
     "typecheck:location": "tsc -p jsconfig.location.json",
     "typecheck:nearby": "tsc -p jsconfig.nearby.json",
     "backend:dev": "powershell -ExecutionPolicy Bypass -File scripts/backend-dev.ps1",
