@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
 import { I18nManager, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import onboardingCore from '../domain/onboardingContextCore';
 import { AIEngine } from '../ai/engine';
 import { loadProfile } from '../ai/memory';
 import {
@@ -63,6 +64,7 @@ const initialState = {
   isAuthenticated: false,
   unreadNotifications: 0,
   notifications: [],
+  onboardingContext: null,
 };
 
 function appReducer(state, action) {
@@ -155,6 +157,8 @@ function appReducer(state, action) {
       return { ...state, unreadNotifications: action.payload };
     case 'SET_NOTIFICATIONS':
       return { ...state, notifications: action.payload };
+    case 'SET_ONBOARDING_CONTEXT':
+      return { ...state, onboardingContext: action.payload, userCity: action.payload?.municipality || state.userCity };
     case 'ADD_NOTIFICATION':
       return { ...state, notifications: [action.payload, ...state.notifications], unreadNotifications: state.unreadNotifications + 1 };
     case 'LOAD_STORED':
@@ -300,10 +304,16 @@ export function AppProvider({ children }) {
       const lang = await AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE);
       const favs = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
       const jobs = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_JOBS);
+      const onboardingRaw = await AsyncStorage.getItem(onboardingCore.STORAGE_KEY);
       const payload = {};
       if (lang) payload.language = lang;
       if (favs) payload.favorites = JSON.parse(favs);
       if (jobs) payload.savedJobs = JSON.parse(jobs);
+      const onboardingContext = onboardingCore.parseStoredContext(onboardingRaw);
+      if (onboardingContext) {
+        payload.onboardingContext = onboardingContext;
+        if (onboardingContext.municipality) payload.userCity = onboardingContext.municipality;
+      }
       if (Object.keys(payload).length) {
         dispatch({ type: 'LOAD_STORED', payload });
       }
@@ -454,6 +464,14 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_AUTH', payload: authSession });
   }, []);
 
+  const setOnboardingContext = useCallback(async (value) => {
+    const normalized = onboardingCore.normalizeContext(value);
+    if (!normalized) return { error: { code: 'INVALID_CONTEXT', message: 'Context could not be saved.' } };
+    await AsyncStorage.setItem(onboardingCore.STORAGE_KEY, onboardingCore.serializeContext(normalized));
+    dispatch({ type: 'SET_ONBOARDING_CONTEXT', payload: normalized });
+    return { data: normalized, error: null };
+  }, []);
+
   const fetchNotifications = useCallback(async () => {
     const result = await naeroNotifications.getAll();
     if (result.data) {
@@ -487,6 +505,7 @@ export function AppProvider({ children }) {
         toggleRealtime,
         fetchLiveNearby,
         setAuth,
+        setOnboardingContext,
         fetchNotifications,
         placeService,
         serviceService,

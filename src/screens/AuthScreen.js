@@ -23,7 +23,7 @@ const OAUTH_ENABLED = process.env.EXPO_PUBLIC_OAUTH_ENABLED === 'true';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
-export default function AuthScreen({ navigation }) {
+export default function AuthScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -47,7 +47,7 @@ export default function AuthScreen({ navigation }) {
           return;
         }
         trackAuth('sign_in_success');
-        navigation.replace('LocationPermission');
+        navigation.replace(route?.params?.onboarding3c ? 'ContextualOnboarding' : 'LocationPermission', route?.params?.onboarding3c ? { initialStep: 'location' } : undefined);
       } else {
         if (!name.trim()) {
           setError('Please enter your name.');
@@ -64,14 +64,14 @@ export default function AuthScreen({ navigation }) {
           setMode('login');
           return;
         }
-        navigation.replace('LocationPermission');
+        navigation.replace(route?.params?.onboarding3c ? 'ContextualOnboarding' : 'LocationPermission', route?.params?.onboarding3c ? { initialStep: 'location' } : undefined);
       }
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
-  }, [mode, email, password, name, navigation]);
+  }, [mode, email, password, name, navigation, route?.params?.onboarding3c]);
 
   const handleForgotPassword = useCallback(async () => {
     if (!email.trim()) {

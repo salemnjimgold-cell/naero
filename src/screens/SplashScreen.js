@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
+import { featureFlags } from '../config/featureFlags';
+import onboardingCore from '../domain/onboardingContextCore';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 const HAS_LAUNCHED_KEY = '@naero_has_launched';
@@ -16,6 +18,7 @@ export default function SplashScreen({ navigation }) {
     const run = async () => {
       const hasLaunched = await AsyncStorage.getItem(HAS_LAUNCHED_KEY);
       const isFirstLaunch = !hasLaunched;
+      const storedContext = onboardingCore.parseStoredContext(await AsyncStorage.getItem(onboardingCore.STORAGE_KEY));
 
       if (isFirstLaunch) {
         await AsyncStorage.setItem(HAS_LAUNCHED_KEY, 'true');
@@ -48,7 +51,7 @@ export default function SplashScreen({ navigation }) {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        navigation.replace('Welcome');
+        navigation.replace(onboardingCore.resolveInitialRoute({ newOnboarding: featureFlags.newOnboarding, hasLaunched: !isFirstLaunch, storedContext }));
       });
     };
 

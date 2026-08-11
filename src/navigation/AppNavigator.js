@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { COLORS, FONTS, DEPTH, ACCENT, TEXT, BORDER } from '../theme';
+import { FONTS, DEPTH, ACCENT, TEXT, BORDER } from '../theme';
 
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -27,6 +27,10 @@ import CommunityDetailScreen from '../screens/CommunityDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import ContextualOnboardingScreen from '../screens/ContextualOnboardingScreen';
+import PlanShellScreen from '../screens/PlanShellScreen';
+import MyNaeroShellScreen from '../screens/MyNaeroShellScreen';
+import { featureFlags } from '../config/featureFlags';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -93,6 +97,26 @@ function TabNavigator() {
   );
 }
 
+function ContextualTabNavigator({ navigation }) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const icons = { Home: ['home', 'home-outline'], Discover: ['compass', 'compass-outline'], Plan: ['list', 'list-outline'], MyNaero: ['person-circle', 'person-circle-outline'] };
+  return <View style={styles.contextualRoot}><Tab.Navigator screenOptions={({ route }) => ({
+    headerShown: false,
+    tabBarIcon: ({ focused, color }) => <Ionicons name={icons[route.name][focused ? 0 : 1]} size={22} color={color} />,
+    tabBarActiveTintColor: ACCENT.primary,
+    tabBarInactiveTintColor: TEXT.tertiary,
+    tabBarLabelStyle: FONTS.tab,
+    tabBarItemStyle: { minHeight: 48 },
+    tabBarStyle: { backgroundColor: DEPTH.canvas, borderTopColor: BORDER.subtle, borderTopWidth: 1, height: 58 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom },
+  })}>
+    <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: t('nav.home') }} />
+    <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarLabel: t('compass3c.nav.discover') }} />
+    <Tab.Screen name="Plan" component={PlanShellScreen} options={{ tabBarLabel: t('compass3c.nav.plan') }} />
+    <Tab.Screen name="MyNaero" component={MyNaeroShellScreen} options={{ tabBarLabel: t('compass3c.nav.myNaero') }} />
+  </Tab.Navigator><Pressable accessibilityRole="button" accessibilityLabel={t('compass3c.nav.ask')} onPress={() => navigation.navigate('AI')} style={[styles.askButton, { bottom: 72 + insets.bottom }]}><Ionicons name="sparkles" size={24} color={TEXT.primary} /></Pressable></View>;
+}
+
 export default function AppNavigator() {
   return (
     <NavigationContainer theme={{
@@ -122,6 +146,7 @@ export default function AppNavigator() {
           component={WelcomeScreen}
           options={{ animation: 'fade', contentStyle: { backgroundColor: DEPTH.canvas } }}
         />
+        <Stack.Screen name="ContextualOnboarding" component={ContextualOnboardingScreen} options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen
           name="Auth"
           component={AuthScreen}
@@ -134,7 +159,7 @@ export default function AppNavigator() {
         />
         <Stack.Screen
           name="Main"
-          component={TabNavigator}
+          component={featureFlags.newNavigation ? ContextualTabNavigator : TabNavigator}
           options={{ animation: 'fade' }}
         />
         <Stack.Screen
@@ -192,7 +217,10 @@ export default function AppNavigator() {
           component={ProfileScreen}
           options={{ animation: 'slide_from_right' }}
         />
+        <Stack.Screen name="Community" component={CommunityScreen} options={{ animation: 'slide_from_right' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({ contextualRoot: { flex: 1 }, askButton: { position: 'absolute', end: 20, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: ACCENT.primary, borderWidth: 1, borderColor: ACCENT.light, elevation: 5 } });
