@@ -5,6 +5,7 @@ const expoOverrides = Constants.expoConfig?.extra?.featureFlags || {};
 const environmentOverrides = {
   newNavigation: process.env.EXPO_PUBLIC_NAERO_NEW_NAVIGATION,
   newOnboarding: process.env.EXPO_PUBLIC_NAERO_NEW_ONBOARDING,
+  newDiscover: process.env.EXPO_PUBLIC_NAERO_NEW_DISCOVER,
 };
 const developmentOverrides = typeof globalThis !== 'undefined' && __DEV__
   ? (globalThis.__NAERO_FEATURE_FLAGS__ || {})

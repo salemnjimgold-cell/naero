@@ -31,6 +31,8 @@ import ContextualOnboardingScreen from '../screens/ContextualOnboardingScreen';
 import PlanShellScreen from '../screens/PlanShellScreen';
 import MyNaeroShellScreen from '../screens/MyNaeroShellScreen';
 import ContextualHomeBridgeScreen from '../screens/ContextualHomeBridgeScreen';
+import ContextualDiscoverScreen from '../screens/ContextualDiscoverScreen';
+import ContextualDiscoverDetailScreen from '../screens/ContextualDiscoverDetailScreen';
 import { featureFlags } from '../config/featureFlags';
 
 const Tab = createBottomTabNavigator();
@@ -112,7 +114,7 @@ function ContextualTabNavigator({ navigation }) {
     tabBarStyle: { backgroundColor: DEPTH.canvas, borderTopColor: BORDER.subtle, borderTopWidth: 1, height: 58 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom },
   })}>
     <Tab.Screen name="Home" component={ContextualHomeBridgeScreen} options={{ tabBarLabel: t('nav.home') }} />
-    <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarLabel: t('compass3c.nav.discover') }} />
+    <Tab.Screen name="Discover" component={featureFlags.newDiscover ? ContextualDiscoverScreen : DiscoverScreen} options={{ tabBarLabel: t('compass3c.nav.discover') }} />
     <Tab.Screen name="Plan" component={PlanShellScreen} options={{ tabBarLabel: t('compass3c.nav.plan') }} />
     <Tab.Screen name="MyNaero" component={MyNaeroShellScreen} options={{ tabBarLabel: t('compass3c.nav.myNaero') }} />
   </Tab.Navigator><Pressable accessibilityRole="button" accessibilityLabel={t('compass3c.nav.ask')} onPress={() => navigation.navigate('AI')} style={[styles.askButton, { bottom: 72 + insets.bottom }]}><Ionicons name="sparkles" size={24} color={TEXT.primary} /></Pressable></View>;
@@ -193,6 +195,7 @@ export default function AppNavigator() {
           component={PlaceDetailScreen}
           options={{ animation: 'slide_from_right' }}
         />
+        <Stack.Screen name="DiscoverDetail" component={ContextualDiscoverDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen
           name="ServiceDetail"
           component={ServiceDetailScreen}
