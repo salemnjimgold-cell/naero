@@ -30,6 +30,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import ContextualOnboardingScreen from '../screens/ContextualOnboardingScreen';
 import PlanShellScreen from '../screens/PlanShellScreen';
 import MyNaeroShellScreen from '../screens/MyNaeroShellScreen';
+import ContextualHomeBridgeScreen from '../screens/ContextualHomeBridgeScreen';
 import { featureFlags } from '../config/featureFlags';
 
 const Tab = createBottomTabNavigator();
@@ -110,7 +111,7 @@ function ContextualTabNavigator({ navigation }) {
     tabBarItemStyle: { minHeight: 48 },
     tabBarStyle: { backgroundColor: DEPTH.canvas, borderTopColor: BORDER.subtle, borderTopWidth: 1, height: 58 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom },
   })}>
-    <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: t('nav.home') }} />
+    <Tab.Screen name="Home" component={ContextualHomeBridgeScreen} options={{ tabBarLabel: t('nav.home') }} />
     <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarLabel: t('compass3c.nav.discover') }} />
     <Tab.Screen name="Plan" component={PlanShellScreen} options={{ tabBarLabel: t('compass3c.nav.plan') }} />
     <Tab.Screen name="MyNaero" component={MyNaeroShellScreen} options={{ tabBarLabel: t('compass3c.nav.myNaero') }} />
@@ -223,4 +224,4 @@ export default function AppNavigator() {
   );
 }
 
-const styles = StyleSheet.create({ contextualRoot: { flex: 1 }, askButton: { position: 'absolute', end: 20, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: ACCENT.primary, borderWidth: 1, borderColor: ACCENT.light, elevation: 5 } });
+const styles = StyleSheet.create({ contextualRoot: { flex: 1 }, askButton: { position: 'absolute', end: 20, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: ACCENT.primary, borderWidth: 1, borderColor: ACCENT.light, elevation: 10, zIndex: 20 } });

@@ -10,6 +10,7 @@ const en = {
   intent: { title: 'What would be useful now?', body: 'Choose up to four, or decide later.', oriented: 'Get oriented', services: 'Find essential services', healthcare: 'Healthcare', transport: 'Transport', housing: 'Housing', work: 'Work', documents: 'Documents & administration', community: 'Connect with people', explore: 'Just explore', enter: 'Enter Naero' },
   plan: { title: 'Plan', body: 'Plan helps you keep track of things you choose to understand or get done.', empty: 'You have not started a plan.', action: 'Explore what Plan can help with', unavailable: 'Settlement Basics is not enabled yet.' },
   mine: { title: 'My Naero', context: 'Current context', unknown: 'No city selected yet', language: 'Language', account: 'Account', guest: 'Guest', signedIn: 'Signed in', profile: 'Open profile and settings', community: 'Open Community' },
+  home: { title: 'Home', welcome: 'Your local context is ready.', context: 'Current context', unknown: 'Choose a city to make local features relevant.', note: 'The new contextual Home experience arrives in a later milestone. No recommendations or tasks are being inferred yet.' },
 };
 
 const fr = { ...en,
@@ -24,6 +25,7 @@ const fr = { ...en,
   intent: { title: 'Qu’est-ce qui serait utile maintenant ?', body: 'Choisissez jusqu’à quatre options, ou décidez plus tard.', oriented: 'M’orienter', services: 'Trouver les services essentiels', healthcare: 'Santé', transport: 'Transports', housing: 'Logement', work: 'Travail', documents: 'Documents et administration', community: 'Rencontrer des personnes', explore: 'Simplement explorer', enter: 'Entrer dans Naero' },
   plan: { title: 'Plan', body: 'Plan vous aide à suivre ce que vous choisissez de comprendre ou d’accomplir.', empty: 'Vous n’avez commencé aucun plan.', action: 'Découvrir l’aide de Plan', unavailable: 'Les bases de l’installation ne sont pas encore activées.' },
   mine: { title: 'Mon Naero', context: 'Contexte actuel', unknown: 'Aucune ville sélectionnée', language: 'Langue', account: 'Compte', guest: 'Invité', signedIn: 'Connecté', profile: 'Ouvrir le profil et les réglages', community: 'Ouvrir la communauté' },
+  home: { title: 'Accueil', welcome: 'Votre contexte local est prêt.', context: 'Contexte actuel', unknown: 'Choisissez une ville pour les fonctions locales.', note: 'Le nouvel accueil contextuel arrivera plus tard. Aucune recommandation ou tâche n’est encore déduite.' },
 };
 const hu = { ...en,
   nav: { discover: 'Felfedezés', plan: 'Terv', myNaero: 'Saját Naero', ask: 'Kérdezd Naerót' },
@@ -37,6 +39,7 @@ const hu = { ...en,
   intent: { title: 'Mi lenne most hasznos?', body: 'Válassz legfeljebb négyet, vagy dönts később.', oriented: 'Tájékozódás', services: 'Alapvető szolgáltatások', healthcare: 'Egészségügy', transport: 'Közlekedés', housing: 'Lakhatás', work: 'Munka', documents: 'Iratok és ügyintézés', community: 'Kapcsolódás emberekhez', explore: 'Csak felfedezés', enter: 'Belépés a Naeróba' },
   plan: { title: 'Terv', body: 'A Terv segít követni az általad megérteni vagy elvégezni kívánt dolgokat.', empty: 'Még nem kezdtél tervet.', action: 'Fedezd fel, miben segíthet a Terv', unavailable: 'A letelepedési alapok még nincsenek bekapcsolva.' },
   mine: { title: 'Saját Naero', context: 'Jelenlegi környezet', unknown: 'Még nincs város kiválasztva', language: 'Nyelv', account: 'Fiók', guest: 'Vendég', signedIn: 'Bejelentkezve', profile: 'Profil és beállítások megnyitása', community: 'Közösség megnyitása' },
+  home: { title: 'Kezdőlap', welcome: 'A helyi környezet készen áll.', context: 'Jelenlegi környezet', unknown: 'Válassz várost a helyi funkciókhoz.', note: 'Az új kontextuális Kezdőlap egy későbbi mérföldkőben érkezik. Még nem következtetünk ajánlásokra vagy feladatokra.' },
 };
 const ar = { ...en,
   nav: { discover: 'اكتشف', plan: 'الخطة', myNaero: 'نايرو الخاص بي', ask: 'اسأل نايرو' },
@@ -50,6 +53,7 @@ const ar = { ...en,
   intent: { title: 'ما الذي سيكون مفيدًا الآن؟', body: 'اختر حتى أربعة، أو قرر لاحقًا.', oriented: 'التعرّف على المكان', services: 'العثور على الخدمات الأساسية', healthcare: 'الرعاية الصحية', transport: 'المواصلات', housing: 'السكن', work: 'العمل', documents: 'الوثائق والإدارة', community: 'التواصل مع الناس', explore: 'الاستكشاف فقط', enter: 'الدخول إلى نايرو' },
   plan: { title: 'الخطة', body: 'تساعدك الخطة على متابعة الأمور التي تختار فهمها أو إنجازها.', empty: 'لم تبدأ خطة بعد.', action: 'استكشف ما يمكن أن تساعدك فيه الخطة', unavailable: 'أساسيات الاستقرار غير مفعّلة بعد.' },
   mine: { title: 'نايرو الخاص بي', context: 'السياق الحالي', unknown: 'لم يتم اختيار مدينة بعد', language: 'اللغة', account: 'الحساب', guest: 'ضيف', signedIn: 'تم تسجيل الدخول', profile: 'فتح الملف والإعدادات', community: 'فتح المجتمع' },
+  home: { title: 'الرئيسية', welcome: 'سياقك المحلي جاهز.', context: 'السياق الحالي', unknown: 'اختر مدينة لجعل الميزات المحلية ذات صلة.', note: 'ستصل تجربة الصفحة الرئيسية السياقية في مرحلة لاحقة. لا يتم استنتاج توصيات أو مهام بعد.' },
 };
 
 export default { en, ar, fr, hu };

@@ -37,6 +37,7 @@ const navigator = read('src/navigation/AppNavigator.js');
 for (const route of ['Home', 'Discover', 'Plan', 'MyNaero']) assert(navigator.includes(`name="${route}"`), `missing new destination ${route}`);
 assert(!navigator.includes('name="AI" component={AIScreen} options={{ tabBar'), 'Ask Naero must not be a fifth tab');
 assert(navigator.includes('featureFlags.newNavigation ? ContextualTabNavigator : TabNavigator'), 'rollback boundary missing');
+assert(navigator.includes('component={ContextualHomeBridgeScreen}'), 'flagged Home must not expose legacy fabricated prototype state');
 assert(navigator.includes('name="Community"'), 'Community stack route missing');
 assert(read('src/screens/MyNaeroShellScreen.js').includes("navigation.navigate('Community')"), 'Community migration access missing');
 
