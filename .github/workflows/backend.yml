@@ -25,7 +25,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --prefix backend --omit=dev
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm ci --prefix backend --omit=dev
       - run: npx eslint backend/src/
       - run: node backend/scripts/smoke.js
 
