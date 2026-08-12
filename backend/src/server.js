@@ -20,6 +20,7 @@ const { createModerationRoutes } = require('./routes/moderation');
 const { createAIServices } = require('./services/ai/index');
 const { createAIRoutes } = require('./routes/ai');
 const { createGatewayRoutes } = require('./routes/gateway');
+const { runOverpassConnectivityProbe } = require('./diagnostics/overpassConnectivityProbe');
 
 function createRequestHandler(options = {}) {
   const env = options.env || readEnv();
@@ -178,6 +179,8 @@ function startServer(options = {}) {
   server.listen(env.port, () => {
     logger.info('Naero backend listening', { port: env.port, nodeEnv: env.nodeEnv, serviceEnv: env.serviceEnv });
     emitMonitoringEvent(env, 'backend.started', { port: env.port, serviceEnv: env.serviceEnv });
+    const probe = options.overpassConnectivityProbe || runOverpassConnectivityProbe;
+    try { Promise.resolve(probe(env)).catch(() => {}); } catch { /* Diagnostic failure must not affect startup. */ }
   });
   return server;
 }
