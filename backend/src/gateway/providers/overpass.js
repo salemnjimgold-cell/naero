@@ -1,6 +1,6 @@
 const { GatewayError } = require('../errors');
 const { getCategory } = require('../categories');
-const { safeErrorClass } = require('../providerDiagnostics');
+const { safeErrorClass, classifyNetworkError } = require('../providerDiagnostics');
 
 function escapeOverpass(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -103,7 +103,11 @@ function createOverpassProvider(env, options = {}) {
             diagnostics.emit({ provider: 'osm', stage: 'provider_failure', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, errorCode: 'PROVIDER_TIMEOUT', errorClass: 'AbortError' });
             throw new GatewayError('PROVIDER_TIMEOUT', 'OpenStreetMap Overpass timed out.');
           }
-          diagnostics.emit({ provider: 'osm', stage: 'provider_failure', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, errorCode: 'PROVIDER_UNAVAILABLE', errorClass: safeErrorClass(error) });
+          diagnostics.emit({
+            provider: 'osm', stage: 'provider_failure', attempt: attemptNumber,
+            elapsedMs: Date.now() - startedAt, errorCode: 'PROVIDER_UNAVAILABLE',
+            errorClass: safeErrorClass(error), networkClass: classifyNetworkError(error),
+          });
           throw new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap Overpass is unavailable.');
         } finally {
           clearTimeout(timer);
