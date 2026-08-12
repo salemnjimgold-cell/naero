@@ -26,7 +26,7 @@ function createGatewayRoutes(env, options = {}) {
         }
         if (req.method === 'GET' && url.pathname === '/api/v1/nearby') {
           const input = validation.nearby(Object.fromEntries(url.searchParams));
-          const result = await nearbyService.searchNearby(input);
+          const result = await nearbyService.searchNearby(input, { requestId: req.requestId });
           return success(req, result.items, {
             source: result.providers.join('+') || 'nearby-cache',
             cached: result.cached,
