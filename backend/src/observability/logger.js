@@ -57,7 +57,7 @@ const logger = {
   request: (req, meta = {}) => log('info', 'HTTP request', {
     requestId: req.requestId,
     method: req.method,
-    path: req.url,
+    path: String(req.url || '').split('?')[0],
     ...meta,
   }),
   redact,

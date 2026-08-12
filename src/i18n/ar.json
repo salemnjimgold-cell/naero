@@ -5,8 +5,7 @@
   },
   "nav": {
     "home": "الرئيسية",
-    "explore": "استكشف",
-    "services": "خدمات",
+    "discover": "اكتشف",
     "community": "المجتمع",
     "profile": "الملف الشخصي"
   },
@@ -148,6 +147,48 @@
     "fr": "Français",
     "hu": "Magyar"
   },
+  "hub": {
+    "greetingMorning": "صباح الخير",
+    "greetingAfternoon": "مساء الخير",
+    "greetingEvening": "مساء الخير",
+    "greetingNight": "تصبح على خير",
+    "heroTagline": "رحلتك تستمر هنا.",
+    "aiTitle": "كيف يمكنني مساعدتك؟",
+    "aiSubtitle": "اسأل عن أي شيء يتعلق باستقرارك",
+    "askNaero": "اسأل نيرو عن أي شيء...",
+    "journeyTitle": "رحلتك",
+    "journeyStageArrived": "وصلت",
+    "journeyStageSettling": "تستقر",
+    "journeyStageThriving": "تتفوق",
+    "journeyStageConnected": "متصل",
+    "journeyProgress": "{{percent}}% مكتمل",
+    "nextStepTitle": "خطوتك القادمة",
+    "nextStepSubtitle": "بناءً على مرحلتك في الرحلة",
+    "nextStepBank": "افتح حساباً بنكياً",
+    "nextStepBankDesc": "معظم الوافدين الجدد يفعلون ذلك في الأسبوع الأول",
+    "nearbyEssentials": "الأساسيات القريبة",
+    "communityPulse": "نبض المجتمع",
+    "communityPulseLive": "مباشر",
+    "communityPulseDesc": "{{count}} أشخاص يبحثون عن مساعدة بالقرب منك",
+    "askAI": "اسأل نيرو",
+    "chips": {
+      "residence": "الإقامة",
+      "jobs": "وظائف",
+      "housing": "سكن",
+      "translate": "ترجمة",
+      "healthcare": "رعاية صحية",
+      "nearby": "قريب",
+      "documents": "مستندات",
+      "emergency": "طوارئ"
+    },
+    "essentials": {
+      "hospital": "مستشفى",
+      "food": "طعام",
+      "sim": "شريحة",
+      "bank": "بنك",
+      "police": "شرطة"
+    }
+  },
   "common": {
     "loading": "جارٍ التحميل...",
     "error": "حدث خطأ ما",
@@ -164,6 +205,13 @@
   },
   "categories": {
     "restaurants": "مطاعم ومقاهي",
+    "cafés": "مقاهي",
+    "halalFood": "طعام حلال",
+    "supermarkets": "سوبرماركت",
+    "pharmacies": "صيدليات",
+    "hospitals": "مستشفيات",
+    "clinics": "عيادات",
+    "banks": "بنوك وصيارف",
     "landmarks": "معالم وثقافة",
     "healthcare": "رعاية صحية",
     "education": "تعليم ودورات",
@@ -172,6 +220,16 @@
     "housing": "سكن وإيجار",
     "government": "خدمات حكومية",
     "religious": "أماكن دينية",
-    "entertainment": "ترفيه"
+    "entertainment": "ترفيه",
+    "immigration": "هجرة",
+    "languageSchools": "مدارس لغات",
+    "communityCenters": "مراكز مجتمعية",
+    "tourist": "معلومات سياحية",
+    "legal": "مساعدة قانونية",
+    "translation": "ترجمة",
+    "refugee": "دعم اللاجئين",
+    "ngo": "منظمات وجمعيات خيرية",
+    "emergency": "خدمات طوارئ",
+    "jobSupport": "دعم وظيفي"
   }
 }

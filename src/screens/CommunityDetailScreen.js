@@ -10,7 +10,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
 
 const TYPE_CONFIG = {
   post: { color: COLORS.primary, label: 'Post' },
@@ -30,6 +31,7 @@ export default function CommunityDetailScreen({ route, navigation }) {
 
   const handleAddComment = useCallback(() => {
     if (!comment.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setComments((prev) => [
       ...prev,
       { id: Date.now().toString(), text: comment.trim(), author: 'You' },
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -275,7 +277,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(6,182,212,0.1)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

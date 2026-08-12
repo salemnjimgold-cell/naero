@@ -26,8 +26,9 @@ function createNotificationsRepository(baseUrl, serviceRoleKey, fetchImpl = fetc
       return client.request(`${TABLE}?${params.toString()}`);
     },
 
-    getById: async (id) => {
-      return client.request(`${TABLE}?id=eq.${encodeURIComponent(id)}&select=*`);
+    getById: async (id, userId) => {
+      const ownershipFilter = userId ? `&user_id=eq.${encodeURIComponent(userId)}` : '';
+      return client.request(`${TABLE}?id=eq.${encodeURIComponent(id)}${ownershipFilter}&select=*`);
     },
 
     create: async (notification) => {
@@ -46,8 +47,8 @@ function createNotificationsRepository(baseUrl, serviceRoleKey, fetchImpl = fetc
       });
     },
 
-    markRead: async (id) => {
-      return client.request(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {
+    markRead: async (id, userId) => {
+      return client.request(`${TABLE}?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'sent', read_at: new Date().toISOString() }),
         headers: { prefer: 'return=representation' },

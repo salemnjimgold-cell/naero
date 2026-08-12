@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import i18n from '../i18n';
-import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, FONTS, SPACING, RADIUS } from '../theme';
 
 const LANGUAGES = [
   { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },

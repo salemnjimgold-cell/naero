@@ -14,7 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, ACCENT, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { jobTypes } from '../data/categories';
 import { JobCard } from '../components/ListingCard';
@@ -44,7 +45,7 @@ function TypeChip({ type, active, onPress, index }) {
         style={[styles.typeChip, isActive && styles.typeChipActive]}
       >
         <LinearGradient
-          colors={isActive ? ['#06B6D4', '#0891B2'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+          colors={isActive ? [ACCENT.primary, ACCENT.dark] : ['rgba(248,250,252,0.04)', 'rgba(248,250,252,0.01)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.typeChipGrad}
@@ -88,6 +89,7 @@ export default function JobsScreen({ navigation }) {
   }, [activeType, allJobs]);
 
   const handleJobPress = useCallback((item) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     navigation.navigate('JobDetail', { item });
   }, [navigation]);
 
@@ -102,7 +104,7 @@ export default function JobsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+        colors={['rgba(59,130,246,0.06)', COLORS.bg]}
         style={[styles.header, { paddingTop: insets.top + SPACING.md }]}
       >
         <View style={styles.headerRow}>
@@ -140,7 +142,7 @@ export default function JobsScreen({ navigation }) {
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={!activeType ? ['#06B6D4', '#0891B2'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+              colors={!activeType ? [ACCENT.primary, ACCENT.dark] : ['rgba(248,250,252,0.04)', 'rgba(248,250,252,0.01)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.typeChipGrad}

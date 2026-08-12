@@ -6,13 +6,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  Image,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import * as Haptics from 'expo-haptics';
+
+const LOGO_PLACEHOLDER = require('../../assets/branding/naero-logo.png');
 
 export default function PlaceDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
@@ -21,29 +25,41 @@ export default function PlaceDetailScreen({ route, navigation }) {
   const { favorites, toggleFavorite } = useApp();
   const isFavorite = favorites.includes(item.id);
 
+  const imageSrc = item.image_url
+    ? { uri: item.image_url }
+    : item.image
+      ? (typeof item.image === 'string' ? { uri: item.image } : item.image)
+      : null;
+
   const handleCall = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     if (item.phone) {
       Linking.openURL(`tel:${item.phone.replace(/[^+\d]/g, '')}`);
     }
   };
 
   const handleDirections = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(item.address)}`);
   };
 
   return (
     <View style={styles.container}>
       <View style={[styles.imageSection, { paddingTop: insets.top }]}>
-        <LinearGradient
-          colors={[COLORS.primary + '40', COLORS.primary + '10', COLORS.bg]}
-          locations={[0, 0.5, 1]}
-          style={styles.imagePlaceholder}
-        >
-          <View style={styles.imageContent}>
-            <Ionicons name="image-outline" size={48} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.imageHint}>No image available</Text>
-          </View>
-        </LinearGradient>
+        {imageSrc ? (
+          <Image source={imageSrc} style={styles.detailImage} resizeMode="cover" />
+        ) : (
+          <LinearGradient
+            colors={[COLORS.primary + '40', COLORS.primary + '10', COLORS.bg]}
+            locations={[0, 0.5, 1]}
+            style={styles.imagePlaceholder}
+          >
+            <View style={styles.imageContent}>
+              <Image source={LOGO_PLACEHOLDER} style={{ width: 64, height: 64, opacity: 0.3 }} resizeMode="contain" />
+              <Text style={styles.imageHint}>No image available</Text>
+            </View>
+          </LinearGradient>
+        )}
         <View style={[styles.imageOverlay, { paddingTop: insets.top + SPACING.md }]}>
           <TouchableOpacity
             style={styles.circleBtn}
@@ -62,15 +78,22 @@ export default function PlaceDetailScreen({ route, navigation }) {
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.gradientOverlay}>
-          <LinearGradient
-            colors={['transparent', COLORS.bg]}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
+        {imageSrc && (
+          <View style={styles.gradientOverlay}>
+            <LinearGradient
+              colors={['transparent', COLORS.bg]}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        )}
         <View style={styles.priceBadge}>
           <Text style={styles.priceBadgeText}>{item.priceLevel}</Text>
         </View>
+        {item.demo && (
+          <View style={styles.demoBadge}>
+            <Text style={styles.demoBadgeText}>Demo data</Text>
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
@@ -240,7 +263,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   tag: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     borderRadius: RADIUS.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -250,6 +273,25 @@ const styles = StyleSheet.create({
   tagText: {
     ...FONTS.caption,
     color: COLORS.textTertiary,
+  },
+  detailImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  demoBadge: {
+    position: 'absolute',
+    top: SPACING.xl,
+    right: SPACING.md,
+    backgroundColor: COLORS.warning + 'CC',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  demoBadgeText: {
+    ...FONTS.smallBold,
+    color: COLORS.black,
+    fontSize: 10,
   },
   section: {
     padding: SPACING.xl,
@@ -310,7 +352,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: 'rgba(6,182,212,0.1)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING.lg,
     borderWidth: 1,

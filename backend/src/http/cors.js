@@ -1,12 +1,15 @@
 function getCorsHeaders(req, allowedOrigins) {
   const origin = req.headers.origin;
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-  return {
-    'access-control-allow-origin': allowOrigin,
+  const headers = {
     'access-control-allow-methods': 'GET,PUT,OPTIONS',
-    'access-control-allow-headers': 'authorization,content-type',
+    'access-control-allow-headers': 'authorization,content-type,x-request-id',
     'access-control-max-age': '86400',
   };
+  if (origin && allowedOrigins.includes(origin)) {
+    headers['access-control-allow-origin'] = origin;
+    headers.vary = 'origin';
+  }
+  return headers;
 }
 
 module.exports = {

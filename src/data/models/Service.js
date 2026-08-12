@@ -35,15 +35,15 @@ export class Service {
   }
 
   static categories = {
-    legal: { icon: 'shield-checkmark', color: '#6366F1' },
+    legal: { icon: 'shield-checkmark', color: '#60A5FA' },
     translation: { icon: 'language', color: '#8B5CF6' },
     housing: { icon: 'home', color: '#1A936F' },
     healthcare: { icon: 'medkit', color: '#EF4444' },
     education: { icon: 'school', color: '#F59E0B' },
     transport: { icon: 'car', color: '#3B82F6' },
-    banking: { icon: 'wallet', color: '#10B981' },
+    banking: { icon: 'wallet', color: '#3B82F6' },
     food: { icon: 'fast-food', color: '#FF6B35' },
-    refugee: { icon: 'people', color: '#06B6D4' },
+    refugee: { icon: 'people', color: '#60A5FA' },
     ngo: { icon: 'heart', color: '#EC4899' },
     emergency: { icon: 'alert-circle', color: '#EF4444' },
     jobSupport: { icon: 'briefcase', color: '#0EA5E9' },

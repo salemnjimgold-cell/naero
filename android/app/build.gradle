@@ -4,11 +4,17 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
-def naeroReleaseStoreFile = findProperty('NAERO_RELEASE_STORE_FILE') ?: System.getenv('NAERO_RELEASE_STORE_FILE')
-def naeroReleaseStorePassword = findProperty('NAERO_RELEASE_STORE_PASSWORD') ?: System.getenv('NAERO_RELEASE_STORE_PASSWORD')
-def naeroReleaseKeyAlias = findProperty('NAERO_RELEASE_KEY_ALIAS') ?: System.getenv('NAERO_RELEASE_KEY_ALIAS')
-def naeroReleaseKeyPassword = findProperty('NAERO_RELEASE_KEY_PASSWORD') ?: System.getenv('NAERO_RELEASE_KEY_PASSWORD')
-def hasNaeroReleaseSigning = naeroReleaseStoreFile && naeroReleaseStorePassword && naeroReleaseKeyAlias && naeroReleaseKeyPassword
+def releaseSigningValue = { String name ->
+    def projectValue = findProperty(name)
+    return projectValue != null ? projectValue.toString() : System.getenv(name)
+}
+def releaseSigning = [
+    storeFile: releaseSigningValue('NAERO_RELEASE_STORE_FILE'),
+    storePassword: releaseSigningValue('NAERO_RELEASE_STORE_PASSWORD'),
+    keyAlias: releaseSigningValue('NAERO_RELEASE_KEY_ALIAS'),
+    keyPassword: releaseSigningValue('NAERO_RELEASE_KEY_PASSWORD'),
+]
+def releaseSigningConfigured = releaseSigning.values().every { it != null && !it.trim().isEmpty() }
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -93,13 +99,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.naero.app'
+    namespace 'com.salemnjimgold.naeroapp'
     defaultConfig {
-        applicationId 'com.naero.app'
+        applicationId 'com.salemnjimgold.naeroapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.1.3"
+        versionCode 1
+        versionName "1.2.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -109,19 +115,13 @@ android {
             storePassword 'android'
             keyAlias 'androiddebugkey'
             keyPassword 'android'
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
         }
-        if (hasNaeroReleaseSigning) {
+        if (releaseSigningConfigured) {
             release {
-                storeFile file(naeroReleaseStoreFile)
-                storePassword naeroReleaseStorePassword
-                keyAlias naeroReleaseKeyAlias
-                keyPassword naeroReleaseKeyPassword
-                enableV1Signing = true
-                enableV2Signing = true
-                enableV3Signing = true
+                storeFile file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
             }
         }
     }
@@ -130,7 +130,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig hasNaeroReleaseSigning ? signingConfigs.release : signingConfigs.debug
+            signingConfig releaseSigningConfigured ? signingConfigs.release : null
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -147,6 +147,15 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def requestsReleaseArtifact = graph.allTasks.any { task ->
+        task.project == project && task.name in ['assembleRelease', 'bundleRelease', 'packageRelease']
+    }
+    if (requestsReleaseArtifact && !releaseSigningConfigured) {
+        throw new GradleException('Naero release signing is not configured. Provide all NAERO_RELEASE_* values outside Git.')
     }
 }
 

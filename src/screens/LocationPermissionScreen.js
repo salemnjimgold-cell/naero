@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,28 +6,32 @@ import {
   Animated,
   Image,
   TouchableOpacity,
-  Dimensions,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import { ManualCityModal } from '../components/ManualCityModal';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
-const { width } = Dimensions.get('window');
-
 export default function LocationPermissionScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { requestLocationPermission, locationLoading, locationPermissionStatus } = useApp();
+  const {
+    requestLocationPermission,
+    selectManualCity,
+    locationLoading,
+    locationPermissionStatus,
+    locationError,
+  } = useApp();
+  const [showManualCity, setShowManualCity] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const autoSkipped = useRef(false);
 
   React.useEffect(() => {
     if (autoSkipped.current) return;
-    if (locationPermissionStatus === 'granted' || locationPermissionStatus === 'denied') {
+    if (locationPermissionStatus === 'granted') {
       autoSkipped.current = true;
       navigation.replace('Main');
       return;
@@ -44,11 +48,11 @@ export default function LocationPermissionScreen({ navigation }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [locationPermissionStatus]);
+  }, [fadeAnim, locationPermissionStatus, navigation, slideAnim]);
 
   const handleAllow = async () => {
-    await requestLocationPermission();
-    navigation.replace('Main');
+    const result = await requestLocationPermission();
+    if (result?.snapshot) navigation.replace('Main');
   };
 
   const handleNotNow = () => {
@@ -103,10 +107,17 @@ export default function LocationPermissionScreen({ navigation }) {
           <View style={styles.privacyNote}>
             <Ionicons name="shield-checkmark" size={16} color={COLORS.secondary} />
             <Text style={styles.privacyText}>
-              Your location never leaves your device unless you explicitly search
-              for nearby places.
+              Naero stores your location choice on this device. GPS is optional,
+              and you can clear it at any time.
             </Text>
           </View>
+
+          {locationError && (
+            <View style={styles.errorNote}>
+              <Ionicons name="alert-circle-outline" size={16} color={COLORS.warning} />
+              <Text style={styles.errorText}>{locationError.message}</Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.allowBtn, locationLoading && styles.btnDisabled]}
@@ -132,6 +143,15 @@ export default function LocationPermissionScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={styles.manualBtn}
+            onPress={() => setShowManualCity(true)}
+            disabled={locationLoading}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.manualText}>Choose a city manually</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.notNowBtn}
             onPress={handleNotNow}
             activeOpacity={0.7}
@@ -146,6 +166,16 @@ export default function LocationPermissionScreen({ navigation }) {
           </Text>
         </View>
       </LinearGradient>
+      <ManualCityModal
+        visible={showManualCity}
+        loading={locationLoading}
+        onClose={() => setShowManualCity(false)}
+        onSave={async (city) => {
+          const result = await selectManualCity(city);
+          if (!result?.error) navigation.replace('Main');
+          return result;
+        }}
+      />
     </View>
   );
 }
@@ -265,6 +295,25 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
+  },
+  errorNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    ...FONTS.caption,
+    color: COLORS.warning,
+    flex: 1,
+  },
+  manualBtn: {
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+  },
+  manualText: {
+    ...FONTS.bodyBold,
+    color: COLORS.primary,
   },
   notNowBtn: {
     paddingVertical: SPACING.lg,

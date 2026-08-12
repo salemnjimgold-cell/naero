@@ -5,8 +5,7 @@
   },
   "nav": {
     "home": "Főoldal",
-    "explore": "Felfedezés",
-    "services": "Szolgáltatások",
+    "discover": "Felfedezés",
     "community": "Közösség",
     "profile": "Profil"
   },
@@ -148,6 +147,48 @@
     "fr": "Français",
     "hu": "Magyar"
   },
+  "hub": {
+    "greetingMorning": "Jó reggelt",
+    "greetingAfternoon": "Jó napot",
+    "greetingEvening": "Jó estét",
+    "greetingNight": "Jó éjszakát",
+    "heroTagline": "Utazásod itt folytatódik.",
+    "aiTitle": "Hogyan segíthetek?",
+    "aiSubtitle": "Kérdezz bármit a letelepedésről",
+    "askNaero": "Kérdezd a Naero-t...",
+    "journeyTitle": "Utazásod",
+    "journeyStageArrived": "Megérkeztél",
+    "journeyStageSettling": "Letelepedés",
+    "journeyStageThriving": "Kiteljesedés",
+    "journeyStageConnected": "Kapcsolódás",
+    "journeyProgress": "{{percent}}% kész",
+    "nextStepTitle": "Következő lépésed",
+    "nextStepSubtitle": "Az utad alapján",
+    "nextStepBank": "Nyiss bankszámlát",
+    "nextStepBankDesc": "A legtöbb új lakos az első héten teszi ezt",
+    "nearbyEssentials": "Közelben lévő alapvetők",
+    "communityPulse": "Közösségi pulzus",
+    "communityPulseLive": "Élő",
+    "communityPulseDesc": "{{count}} ember kér segítséget a közeledben",
+    "askAI": "Kérdezd a Naero-t",
+    "chips": {
+      "residence": "Tartózkodás",
+      "jobs": "Állások",
+      "housing": "Lakhatás",
+      "translate": "Fordítás",
+      "healthcare": "Egészségügy",
+      "nearby": "Közelben",
+      "documents": "Dokumentumok",
+      "emergency": "Vészhelyzet"
+    },
+    "essentials": {
+      "hospital": "Kórház",
+      "food": "Étel",
+      "sim": "SIM",
+      "bank": "Banka",
+      "police": "Rendőrség"
+    }
+  },
   "common": {
     "loading": "Betöltés...",
     "error": "Hiba történt",
@@ -164,6 +205,13 @@
   },
   "categories": {
     "restaurants": "Éttermek & Kávézók",
+    "cafés": "Kávézók",
+    "halalFood": "Halal ételek",
+    "supermarkets": "Szupermarketek",
+    "pharmacies": "Gyógyszertárak",
+    "hospitals": "Kórházak",
+    "clinics": "Klinikák",
+    "banks": "Bankok & ATM-ek",
     "landmarks": "Nevezetességek & Kultúra",
     "healthcare": "Egészségügy",
     "education": "Oktatás & Tanfolyamok",
@@ -172,6 +220,16 @@
     "housing": "Lakhatás & Bérlés",
     "government": "Kormányzati szolgáltatások",
     "religious": "Vallási helyek",
-    "entertainment": "Szórakozás"
+    "entertainment": "Szórakozás",
+    "immigration": "Bevándorlás",
+    "languageSchools": "Nyelviskolák",
+    "communityCenters": "Közösségi központok",
+    "tourist": "Turisztikai info",
+    "legal": "Jogi segítség",
+    "translation": "Fordítás",
+    "refugee": "Menekült támogatás",
+    "ngo": "NGO-k & Jótékonyság",
+    "emergency": "Sürgősségi szolgáltatások",
+    "jobSupport": "Álláskeresési támogatás"
   }
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, GRADIENTS, FONTS, RADIUS, SPACING, SHADOWS } from '../theme';
+import { COLORS, BORDER, GRADIENTS, FONTS, RADIUS, SPACING, SHADOWS } from '../theme';
 
 export function PrimaryButton({ title, onPress, icon, style, textStyle, disabled }) {
   return (
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.xxl,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: BORDER.default,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

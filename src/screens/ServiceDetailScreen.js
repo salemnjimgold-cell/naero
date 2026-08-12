@@ -11,7 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
 
 export default function ServiceDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
@@ -19,10 +20,12 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const { item } = route.params;
 
   const handleCall = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     Linking.openURL(`tel:${item.contact.replace(/[^+\d]/g, '')}`);
   };
 
   const handleDirections = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(item.location)}`);
   };
 
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -227,7 +230,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: 'rgba(6,182,212,0.1)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING.lg,
     borderWidth: 1,

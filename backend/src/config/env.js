@@ -34,16 +34,45 @@ function readEnv(source = process.env) {
     .map((origin) => origin.trim())
     .filter(Boolean);
   const monitoringSampleRate = Number.parseFloat(mergedSource.MONITORING_SAMPLE_RATE || '1');
+  const rateLimitWindowMs = Number.parseInt(mergedSource.API_RATE_LIMIT_WINDOW_MS || '60000', 10);
+  const rateLimitMax = Number.parseInt(mergedSource.API_RATE_LIMIT_MAX || '60', 10);
+  const providerTimeoutMs = Number.parseInt(mergedSource.PROVIDER_TIMEOUT_MS || '8000', 10);
+  const nearbyCacheTtlMs = Number.parseInt(mergedSource.NEARBY_CACHE_TTL_MS || '300000', 10);
+  const nearbyCacheStaleMs = Number.parseInt(mergedSource.NEARBY_CACHE_STALE_MS || '1800000', 10);
+  const verifiedCacheTtlMs = Number.parseInt(mergedSource.VERIFIED_SERVICES_CACHE_TTL_MS || '21600000', 10);
+  const allowedOrigins = (mergedSource.ALLOWED_ORIGINS || mergedSource.CORS_ORIGINS || '')
+    .split(',').map((origin) => origin.trim()).filter(Boolean);
 
   return {
     nodeEnv: mergedSource.NODE_ENV || 'development',
     serviceEnv: mergedSource.NAERO_SERVICE_ENV || mergedSource.NODE_ENV || 'development',
     port: Number.isFinite(port) ? port : 8787,
-    corsOrigins: corsOrigins.length ? corsOrigins : DEFAULT_CORS_ORIGINS,
+    corsOrigins: allowedOrigins.length ? allowedOrigins : (corsOrigins.length ? corsOrigins : DEFAULT_CORS_ORIGINS),
     publicBaseUrl: mergedSource.PUBLIC_BASE_URL || '',
     monitoring: {
       webhookUrl: mergedSource.MONITORING_WEBHOOK_URL || '',
       sampleRate: Number.isFinite(monitoringSampleRate) ? monitoringSampleRate : 1,
+    },
+    gateway: {
+      rateLimit: {
+        windowMs: Number.isFinite(rateLimitWindowMs) && rateLimitWindowMs > 0 ? rateLimitWindowMs : 60000,
+        max: Number.isFinite(rateLimitMax) && rateLimitMax > 0 ? rateLimitMax : 60,
+      },
+      providerTimeoutMs: Number.isFinite(providerTimeoutMs) && providerTimeoutMs > 0
+        ? Math.min(providerTimeoutMs, 15000) : 8000,
+      nearbyCache: {
+        ttlMs: Number.isFinite(nearbyCacheTtlMs) && nearbyCacheTtlMs >= 0 ? nearbyCacheTtlMs : 300000,
+        staleMs: Number.isFinite(nearbyCacheStaleMs) && nearbyCacheStaleMs >= 0 ? nearbyCacheStaleMs : 1800000,
+      },
+      verifiedCacheTtlMs: Number.isFinite(verifiedCacheTtlMs) && verifiedCacheTtlMs >= 0
+        ? verifiedCacheTtlMs : 21600000,
+      debugLocationLogging: mergedSource.DEBUG_LOCATION_LOGGING === 'true' && mergedSource.NODE_ENV !== 'production',
+    },
+    providers: {
+      googlePlacesApiKey: mergedSource.GOOGLE_PLACES_API_KEY || '',
+      googleMapsApiKey: mergedSource.GOOGLE_MAPS_API_KEY || '',
+      nominatimBaseUrl: mergedSource.NOMINATIM_BASE_URL || '',
+      overpassApiUrl: mergedSource.OVERPASS_API_URL || '',
     },
     supabase: {
       url: mergedSource.SUPABASE_URL || '',

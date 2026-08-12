@@ -8,23 +8,23 @@ import {
   Share,
   Linking,
   Image,
-  TextInput,
-  Modal,
   Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { LanguageModal } from '../components/LanguageModal';
-import { PrimaryButton, SecondaryButton } from '../components/BrandedButtons';
-import { saveManualCity, getManualCity, clearLocation } from '../services/locationService';
+import { ManualCityModal } from '../components/ManualCityModal';
+import { signOut, signInAsGuest, trackAuth } from '../services';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
 const menuItems = [
+  { id: 'notifications', icon: 'notifications-outline', color: COLORS.primary },
   { id: 'settings', icon: 'settings-outline', color: COLORS.textSecondary, screen: 'Settings' },
   { id: 'saved', icon: 'heart-outline', color: COLORS.error },
   { id: 'savedJobs', icon: 'briefcase-outline', color: COLORS.primary },
@@ -37,7 +37,12 @@ const menuItems = [
 export default function ProfileScreen({ navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { favorites, savedJobs, savedPlaces, userLocation, userCity, hasLocationPermission, requestLocationPermission, refreshLocation, locationLoading } = useApp();
+  const {
+    favorites, savedJobs, savedPlaces, userCity, hasLocationPermission,
+    requestLocationPermission, refreshLocation, selectManualCity, disableLocation,
+    clearLocationData, locationLoading, locationPreference, locationError,
+    auth, isAuthenticated, unreadNotifications,
+  } = useApp();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
   const [manualCity, setManualCity] = useState('');
@@ -45,7 +50,17 @@ export default function ProfileScreen({ navigation }) {
 
   const handleMenuPress = useCallback(
     (itemId) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       switch (itemId) {
+        case 'notifications':
+          navigation.navigate('Notifications');
+          break;
+        case 'saved':
+          navigation.navigate('Discover');
+          break;
+        case 'savedJobs':
+          navigation.navigate('Jobs');
+          break;
         case 'language':
           setShowLanguageModal(true);
           break;
@@ -68,11 +83,31 @@ export default function ProfileScreen({ navigation }) {
     [navigation]
   );
 
+  const handleLogout = useCallback(async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            await signInAsGuest();
+            trackAuth('sign_out');
+            navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+          },
+        },
+      ]
+    );
+  }, [navigation]);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}>
         <LinearGradient
-          colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+          colors={['rgba(59,130,246,0.06)', COLORS.bg]}
           style={[styles.header, { paddingTop: insets.top + SPACING.xl }]}
         >
           <View style={styles.profileInfo}>
@@ -82,8 +117,8 @@ export default function ProfileScreen({ navigation }) {
                 <Ionicons name="pencil" size={12} color={COLORS.white} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.profileName}>{t('profile.guest')}</Text>
-            <Text style={styles.profileEmail}>guest@naero.app</Text>
+            <Text style={styles.profileName}>{isAuthenticated ? auth?.user?.displayName || 'User' : t('profile.guest')}</Text>
+            <Text style={styles.profileEmail}>{isAuthenticated ? auth?.user?.email || '' : 'Guest'}</Text>
           </View>
 
           <View style={styles.statsRow}>
@@ -110,6 +145,11 @@ export default function ProfileScreen({ navigation }) {
                 <Ionicons name={item.icon} size={20} color={item.color} />
               </View>
               <Text style={styles.menuLabel}>{t(`profile.${item.id}`)}</Text>
+              {item.id === 'notifications' && unreadNotifications > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadNotifications > 9 ? '9+' : unreadNotifications}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
             </TouchableOpacity>
           ))}
@@ -123,15 +163,19 @@ export default function ProfileScreen({ navigation }) {
                 <Ionicons name="location" size={18} color={COLORS.success} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.locationLabel}>{userCity}</Text>
-                  <Text style={styles.locationStatusText}>Location active</Text>
+                  <Text style={styles.locationStatusText}>
+                    {locationPreference === 'manual' ? 'Manual city' : 'Device location active'}
+                  </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.locationAction}
-                  onPress={refreshLocation}
-                  disabled={locationLoading}
-                >
-                  <Ionicons name="refresh" size={18} color={COLORS.primary} />
-                </TouchableOpacity>
+                {locationPreference === 'auto' && (
+                  <TouchableOpacity
+                    style={styles.locationAction}
+                    onPress={refreshLocation}
+                    disabled={locationLoading}
+                  >
+                    <Ionicons name="refresh" size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <View style={styles.locationStatusRow}>
@@ -139,7 +183,7 @@ export default function ProfileScreen({ navigation }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.locationLabel}>Location off</Text>
                   <Text style={styles.locationStatusText}>
-                    {userCity ? `Using: ${userCity}` : 'Enable for nearby recommendations'}
+                    {locationError?.message || 'Enable GPS or choose a city manually'}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -154,7 +198,7 @@ export default function ProfileScreen({ navigation }) {
             <TouchableOpacity
               style={styles.locationManualRow}
               onPress={() => {
-                getManualCity().then((c) => setManualCity(c || ''));
+                setManualCity(userCity || '');
                 setShowCityModal(true);
               }}
             >
@@ -183,12 +227,20 @@ export default function ProfileScreen({ navigation }) {
           {showPrivacyNote && (
             <View style={styles.privacyContent}>
               <Text style={styles.privacyText}>
-                • Location is used only to show nearby services, places, and community help.{'\n'}
-                • Your location never leaves your device unless you search for nearby places.{'\n'}
-                • You can disable location access anytime in your device Settings.{'\n'}
-                • Saved location can be cleared or refreshed at any time.{'\n'}
-                • If location is off, you can manually set your city.
+                • Naero stores your selected city and last device location on this device.{'\n'}
+                • GPS is foreground-only; background location is not requested.{'\n'}
+                • You can disable Naero&apos;s use of location without changing device permission.{'\n'}
+                • You can use a manual city instead of GPS.{'\n'}
+                • Clear removes Naero&apos;s stored location and manual city.
               </Text>
+              {locationPreference !== 'off' && (
+                <TouchableOpacity
+                  style={styles.clearLocationBtn}
+                  onPress={disableLocation}
+                >
+                  <Text style={styles.clearLocationText}>Disable Location Use</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.clearLocationBtn}
                 onPress={() => {
@@ -201,8 +253,7 @@ export default function ProfileScreen({ navigation }) {
                         text: 'Clear',
                         style: 'destructive',
                         onPress: async () => {
-                          await clearLocation();
-                          refreshLocation();
+                          await clearLocationData();
                         },
                       },
                     ]
@@ -215,11 +266,11 @@ export default function ProfileScreen({ navigation }) {
           )}
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>{t('profile.logout')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>{t('profile.version')} 1.0.0</Text>
+        <Text style={styles.version}>{t('profile.version')} 1.2.0</Text>
       </ScrollView>
 
       <LanguageModal
@@ -227,52 +278,13 @@ export default function ProfileScreen({ navigation }) {
         onClose={() => setShowLanguageModal(false)}
       />
 
-      <Modal
+      <ManualCityModal
         visible={showCityModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCityModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="location-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.modalTitle}>Set Your City</Text>
-            </View>
-            <Text style={styles.modalDesc}>
-              Enter the city you are currently in so Naero can show relevant information.
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={manualCity}
-              onChangeText={setManualCity}
-              placeholder="e.g. Budapest, Debrecen, Szeged"
-              placeholderTextColor={COLORS.textTertiary}
-              autoCapitalize="words"
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setShowCityModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSave}
-                onPress={async () => {
-                  if (manualCity.trim()) {
-                    await saveManualCity(manualCity.trim());
-                    refreshLocation();
-                    setShowCityModal(false);
-                  }
-                }}
-              >
-                <Text style={styles.modalSaveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        initialCity={manualCity}
+        loading={locationLoading}
+        onClose={() => setShowCityModal(false)}
+        onSave={selectManualCity}
+      />
     </View>
   );
 }
@@ -380,6 +392,21 @@ const styles = StyleSheet.create({
     ...FONTS.body,
     color: COLORS.textPrimary,
     flex: 1,
+  },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    marginRight: SPACING.sm,
+  },
+  badgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   logoutBtn: {
     marginHorizontal: SPACING.xl,

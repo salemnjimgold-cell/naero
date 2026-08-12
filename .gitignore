@@ -18,5 +18,26 @@ android/.gradle/
 android/build/
 android/app/build/
 android/app/.cxx/
+android/app/src/main/assets/
+android/app/src/main/res/drawable-*/node_modules_*
+android/app/src/main/res/drawable-*/assets_branding_*
+android/app/src/main/res/raw/
 .DS_Store
 *.log
+
+# Reproducible/local QA and build evidence (preserved outside Git)
+artifacts/
+qa_screenshots/
+ui_dump.xml
+test_phase0.png
+
+# Unreferenced local design/reference experiments preserved by Milestone 5A backup
+37235d0026da3ea7c7c163603fec4a4d.webp
+Gemini_Generated_Image_*.png
+image_1_*.jpg
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+!.env.*.example

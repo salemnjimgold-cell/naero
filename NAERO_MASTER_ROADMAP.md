@@ -158,19 +158,18 @@ Remaining:
 
 ## Sprint 3 Backend Deployment & Infrastructure
 
-Status: Repository-side implementation complete; real remote deployment pending provider, Supabase, DNS, and secret-manager access. AI Gateway explicitly excluded.
+Status: In progress. Database schema implementation underway. AI Gateway explicitly excluded.
 
 Mission:
 
-Deploy the Sprint 2 backend foundation into reliable staging/production-style infrastructure so Naero has a real, secret-managed backend boundary before AI platform work begins.
+Deploy the Sprint 2 backend foundation into reliable staging/production-style infrastructure with a production-ready Supabase/PostgreSQL database. Sprint 3 is infrastructure and database only — no AI platform work.
 
 Scope:
 
+### Infrastructure
 - Done: Add reproducible local backend developer setup.
 - Done: Add development/staging/production env examples.
 - Done: Add backend startup, healthcheck, and smoke-test scripts.
-- Done: Add database migration instructions.
-- Done: Add seed-data policy.
 - Done: Add Docker backend definition and Render staging blueprint.
 - Done: Add staging-first deployment workflow.
 - Done: Add structured request logging and request IDs.
@@ -178,10 +177,18 @@ Scope:
 - Done: Verify local backend health and smoke tests.
 - Pending external access: Deploy backend to staging.
 - Pending external access: Configure Supabase project.
-- Pending external access: Apply database migrations to live Supabase.
 - Pending external access: Configure environment secrets in provider.
 - Pending external access: Configure HTTPS and health checks in provider.
 - Pending external access: Verify deployed backend stability and smoke tests.
+
+### Database (Sprint 3 Database Sprint 1)
+- Done: Migration 001 — core auth, profiles, user_settings, consent_events (Sprint 2).
+- Done: Migration 002 — places, reviews, reports, ai_conversations, ai_messages, saved_places with UUID PKs, foreign keys, indexes, and RLS.
+- Done: PostgreSQL repository layer — six typed repository modules (places, reviews, reports, ai_conversations, ai_messages, saved_places).
+- Done: Seed data — sample places across categories, sample reviews.
+- Done: Database documentation — table docs, migration guide, index policy, RLS policy docs.
+- Pending: Apply migrations to live Supabase staging project.
+- Pending: Verify RLS policies against staging.
 
 Out of scope:
 
@@ -189,6 +196,7 @@ Out of scope:
 - AI provider integration.
 - Prompt routing, redaction, model selection, or AI billing controls.
 - New mobile product features unless required for backend smoke testing.
+- Frontend modifications of any kind.
 
 Success criteria:
 
@@ -196,6 +204,9 @@ Success criteria:
 - Done locally: health checks and smoke tests pass.
 - Done locally: logs are structured and do not expose sensitive values in tested paths.
 - Done locally: staging/production environment separation is documented.
+- Done locally: all six database tables exist with UUID PKs, FKs, indexes, and RLS.
+- Done locally: seed data can be applied and queried.
+- Done locally: repository layer returns correct data for all CRUD paths.
 - Pending externally: backend is reachable over HTTPS in the approved environment.
 - Pending externally: Supabase project is configured without committing secrets.
 - Pending externally: database migrations are applied and RLS is enabled.

@@ -12,8 +12,9 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import * as Haptics from 'expo-haptics';
 
 const severityConfig = {
   critical: { bg: 'rgba(239,68,68,0.12)', text: COLORS.error, icon: 'alert-circle' },
@@ -46,6 +47,7 @@ export default function SafetyScreen({ navigation }) {
   }
 
   const handleCall = useCallback((number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     Linking.openURL(`tel:${number.replace(/[^+\d]/g, '')}`);
   }, []);
 
@@ -64,7 +66,7 @@ export default function SafetyScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(6,182,212,0.06)', COLORS.bg]}
+        colors={['rgba(59,130,246,0.06)', COLORS.bg]}
         style={[styles.header, { paddingTop: insets.top + SPACING.md }]}
       >
         <View style={styles.headerRow}>
@@ -169,7 +171,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
   },

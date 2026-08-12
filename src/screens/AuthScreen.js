@@ -9,25 +9,84 @@ import {
   Platform,
   ScrollView,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import * as Haptics from 'expo-haptics';
+import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
+import { signInWithEmail, createAccount, requestPasswordReset, trackAuth } from '../services';
+
+const OAUTH_ENABLED = process.env.EXPO_PUBLIC_OAUTH_ENABLED === 'true';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
-export default function AuthScreen({ navigation }) {
+export default function AuthScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = useCallback(() => {
-    navigation.replace('LocationPermission');
-  }, [navigation]);
+  const handleSubmit = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    trackAuth(mode === 'login' ? 'sign_in' : 'sign_up');
+
+    try {
+      if (mode === 'login') {
+        const result = await signInWithEmail(email, password);
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
+        trackAuth('sign_in_success');
+        navigation.replace(route?.params?.onboarding3c ? 'ContextualOnboarding' : 'LocationPermission', route?.params?.onboarding3c ? { initialStep: 'location' } : undefined);
+      } else {
+        if (!name.trim()) {
+          setError('Please enter your name.');
+          return;
+        }
+        const result = await createAccount(email, password, name.trim());
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
+        trackAuth('sign_up_success');
+        if (!result.session) {
+          setError('Account created! Please check your email for a confirmation link before signing in.');
+          setMode('login');
+          return;
+        }
+        navigation.replace(route?.params?.onboarding3c ? 'ContextualOnboarding' : 'LocationPermission', route?.params?.onboarding3c ? { initialStep: 'location' } : undefined);
+      }
+    } catch (err) {
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  }, [mode, email, password, name, navigation, route?.params?.onboarding3c]);
+
+  const handleForgotPassword = useCallback(async () => {
+    if (!email.trim()) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    setLoading(true);
+    const result = await requestPasswordReset(email);
+    setLoading(false);
+    if (result.error) {
+      Alert.alert('Error', result.error);
+    } else {
+      Alert.alert('Password Reset', 'If an account with that email exists, a password reset link has been sent.');
+    }
+  }, [email]);
 
   return (
     <LinearGradient
@@ -66,7 +125,7 @@ export default function AuthScreen({ navigation }) {
           <View style={styles.tabRow}>
             <TouchableOpacity
               style={[styles.tab, mode === 'login' && styles.tabActive]}
-              onPress={() => setMode('login')}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); setMode('login'); setError(null); }}
             >
               <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
                 Sign In
@@ -74,13 +133,20 @@ export default function AuthScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, mode === 'signup' && styles.tabActive]}
-              onPress={() => setMode('signup')}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); setMode('signup'); setError(null); }}
             >
               <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>
                 Sign Up
               </Text>
             </TouchableOpacity>
           </View>
+
+          {error && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
 
           <View style={styles.form}>
             {mode === 'signup' && (
@@ -112,6 +178,7 @@ export default function AuthScreen({ navigation }) {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                 />
               </View>
             </View>
@@ -140,15 +207,16 @@ export default function AuthScreen({ navigation }) {
             </View>
 
             {mode === 'login' && (
-              <TouchableOpacity style={styles.forgotBtn}>
+              <TouchableOpacity style={styles.forgotBtn} onPress={handleForgotPassword}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
               onPress={handleSubmit}
               activeOpacity={0.8}
+              disabled={loading}
             >
               <LinearGradient
                 colors={GRADIENTS.primary}
@@ -156,29 +224,37 @@ export default function AuthScreen({ navigation }) {
                 end={{ x: 1, y: 1 }}
                 style={styles.submitGradient}
               >
-                <Text style={styles.submitText}>
-                  {mode === 'login' ? 'Sign In' : 'Create Account'}
-                </Text>
+                {loading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.submitText}>
+                    {mode === 'login' ? 'Sign In' : 'Create Account'}
+                  </Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
+            {OAUTH_ENABLED && (
+              <>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or continue with</Text>
+                  <View style={styles.dividerLine} />
+                </View>
 
-            <View style={styles.socialRow}>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Ionicons name="logo-google" size={22} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Ionicons name="logo-apple" size={22} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Ionicons name="logo-facebook" size={22} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
+                <View style={styles.socialRow}>
+                  <TouchableOpacity style={styles.socialBtn}>
+                    <Ionicons name="logo-google" size={22} color={COLORS.textPrimary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.socialBtn}>
+                    <Ionicons name="logo-apple" size={22} color={COLORS.textPrimary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.socialBtn}>
+                    <Ionicons name="logo-facebook" size={22} color={COLORS.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
             <Text style={styles.terms}>
               By continuing, you agree to our{' '}
@@ -209,7 +285,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: BORDER.subtle,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.lg,
@@ -241,7 +317,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BORDER.ghost,
     borderRadius: RADIUS.full,
     padding: 4,
     marginBottom: SPACING.xxxl,
@@ -265,6 +341,21 @@ const styles = StyleSheet.create({
   form: {
     gap: SPACING.lg,
   },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.error + '12',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.error + '25',
+  },
+  errorText: {
+    ...FONTS.caption,
+    color: COLORS.error,
+    flex: 1,
+  },
   inputGroup: {
     gap: SPACING.sm,
   },
@@ -276,7 +367,7 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BORDER.ghost,
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     height: 52,
@@ -309,9 +400,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
   },
+  submitBtnDisabled: {
+    opacity: 0.6,
+  },
   submitGradient: {
     paddingVertical: SPACING.lg,
     alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
   },
   submitText: {
     ...FONTS.bodyBold,
@@ -342,7 +438,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BORDER.ghost,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

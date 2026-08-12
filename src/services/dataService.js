@@ -1,15 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isFirebaseConfigured } from '../firebase/config';
 import { createCollection } from '../firebase/firestore';
+import { API_BASE_URL, isRemoteApiEnabled } from '../config/api';
+import { naeroApi } from './api/naeroApi';
 
 const CACHE_PREFIX = '@naero_ds_';
 
 export class DataService {
-  constructor(collectionName, mockData) {
+  constructor(collectionName, mockData, { remoteEndpoint = null, useRemote = true } = {}) {
     this.collectionName = collectionName;
     this.mockData = mockData || [];
     this.firestoreCollection = createCollection(collectionName);
     this.firestoreCollection.setLocalData(this.mockData);
+    this.remoteEndpoint = remoteEndpoint;
+    this.useRemote = useRemote && isRemoteApiEnabled();
     this.cache = null;
     this.cacheTime = null;
     this.cacheTTL = 5 * 60 * 1000;
@@ -30,6 +34,17 @@ export class DataService {
       }
     }
 
+    if (this.useRemote && this.remoteEndpoint && source !== 'local') {
+      const result = await naeroApi.get(this.remoteEndpoint);
+      if (result.data && !result.error) {
+        const items = Array.isArray(result.data) ? result.data : (result.data.data || result.data.items || [result.data]);
+        this.cache = items;
+        this.cacheTime = Date.now();
+        await this._persistCache(items);
+        return { data: items, error: null, source: 'remote' };
+      }
+    }
+
     if (isFirebaseConfigured() && source !== 'local') {
       const result = await this.firestoreCollection.getAll();
       if (result.data && !result.local) {
@@ -42,11 +57,16 @@ export class DataService {
 
     this.cache = [...this.mockData];
     this.cacheTime = Date.now();
-    await this._persistCache(this.mockData);
     return { data: [...this.mockData], error: null, source: 'local' };
   }
 
   async getById(id) {
+    if (this.useRemote && this.remoteEndpoint) {
+      const result = await naeroApi.get(`${this.remoteEndpoint}/${id}`);
+      if (result.data && !result.error) {
+        return { data: result.data, error: null, source: 'remote' };
+      }
+    }
     const all = await this.getAll();
     if (!all.data) return { data: null, error: 'No data' };
     const item = all.data.find((d) => d.id === id);

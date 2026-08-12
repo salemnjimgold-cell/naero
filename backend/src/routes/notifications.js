@@ -22,30 +22,31 @@ function createNotificationRoutes(env, repositories) {
     if (req.method === 'GET' && url.pathname === '/v1/notifications/unread-count') {
       const result = await repositories.notifications.getUnreadCount(userId);
       if (result.error) return { status: 502, body: { error: result.error } };
-      return { status: 200, body: { data: { unread: result.data?.length || 0 } } };
-    }
-
-    if (req.method === 'GET' && url.pathname.startsWith('/v1/notifications/')) {
-      const id = url.pathname.split('/').pop();
-      if (id === 'unread-count') return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Route not found.' } } };
-      const result = await repositories.notifications.getById(id);
-      if (result.error) return { status: 502, body: { error: result.error } };
-      const notification = result.data?.[0];
-      if (!notification) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Notification not found.' } } };
-      if (notification.user_id !== userId) return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Access denied.' } } };
-      return { status: 200, body: { data: notification } };
-    }
-
-    if (req.method === 'PUT' && url.pathname.startsWith('/v1/notifications/')) {
-      const id = url.pathname.split('/').pop();
-      const result = await repositories.notifications.markRead(id);
-      if (result.error) return { status: 502, body: { error: result.error } };
-      return { status: 200, body: { data: { read: true } } };
+      return { status: 200, body: { data: { count: result.data?.length || 0 } } };
     }
 
     if (req.method === 'PUT' && url.pathname === '/v1/notifications/read-all') {
       const result = await repositories.notifications.markAllRead(userId);
       if (result.error) return { status: 502, body: { error: result.error } };
+      return { status: 200, body: { data: { read: true } } };
+    }
+
+    const notificationMatch = url.pathname.match(/^\/v1\/notifications\/([^/]+)$/);
+
+    if (req.method === 'GET' && notificationMatch) {
+      const id = decodeURIComponent(notificationMatch[1]);
+      const result = await repositories.notifications.getById(id, userId);
+      if (result.error) return { status: 502, body: { error: result.error } };
+      const notification = result.data?.[0];
+      if (!notification) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Notification not found.' } } };
+      return { status: 200, body: { data: notification } };
+    }
+
+    if (req.method === 'PUT' && notificationMatch) {
+      const id = decodeURIComponent(notificationMatch[1]);
+      const result = await repositories.notifications.markRead(id, userId);
+      if (result.error) return { status: 502, body: { error: result.error } };
+      if (!result.data?.length) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Notification not found.' } } };
       return { status: 200, body: { data: { read: true } } };
     }
 
