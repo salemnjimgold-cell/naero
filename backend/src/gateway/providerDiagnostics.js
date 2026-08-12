@@ -1,4 +1,5 @@
 const { logger } = require('../observability/logger');
+const { isIP } = require('node:net');
 
 const PROVIDERS = new Set(['naero', 'google', 'osm']);
 const STAGES = new Set([
@@ -32,6 +33,27 @@ const NETWORK_CODE_CLASS = Object.freeze({
   ENETUNREACH: 'network_unreachable',
   EHOSTUNREACH: 'address_unreachable',
 });
+const ADDRESS_FAMILIES = new Set(['IPv4', 'IPv6']);
+const ATTEMPT_OUTCOMES = new Set([
+  'timeout', 'unreachable', 'refused', 'reset', 'closed', 'tls_failure',
+  'other_network_failure',
+]);
+const MAX_ADDRESS_ATTEMPTS = 8;
+const ATTEMPT_CODE_OUTCOME = Object.freeze({
+  UND_ERR_CONNECT_TIMEOUT: 'timeout',
+  ETIMEDOUT: 'timeout',
+  ENETUNREACH: 'unreachable',
+  EHOSTUNREACH: 'unreachable',
+  ECONNREFUSED: 'refused',
+  ECONNRESET: 'reset',
+  UND_ERR_SOCKET: 'closed',
+  UND_ERR_DESTROYED: 'closed',
+  ERR_TLS_CERT_ALTNAME_INVALID: 'tls_failure',
+  CERT_HAS_EXPIRED: 'tls_failure',
+  DEPTH_ZERO_SELF_SIGNED_CERT: 'tls_failure',
+  SELF_SIGNED_CERT_IN_CHAIN: 'tls_failure',
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'tls_failure',
+});
 
 function safeInteger(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   return Number.isInteger(value) && value >= min && value <= max ? value : undefined;
@@ -52,6 +74,50 @@ function safeErrorCode(value) {
 function classifyNetworkError(error) {
   const code = error?.cause?.code || error?.code;
   return NETWORK_CODE_CLASS[code] || 'generic_network_failure';
+}
+
+function safeProperty(value, key) {
+  try { return value != null ? value[key] : undefined; } catch { return undefined; }
+}
+
+function familyFromAttempt(attempt) {
+  const address = safeProperty(attempt, 'address');
+  if (typeof address !== 'string') return undefined;
+  const family = isIP(address);
+  return family === 4 ? 'IPv4' : family === 6 ? 'IPv6' : undefined;
+}
+
+function outcomeFromAttempt(attempt) {
+  const code = safeProperty(attempt, 'code');
+  return ATTEMPT_CODE_OUTCOME[code] || 'other_network_failure';
+}
+
+function classifyAddressFamilyAttempts(error) {
+  try {
+    const cause = safeProperty(error, 'cause');
+    const nestedCause = safeProperty(cause, 'cause');
+    const aggregate = cause instanceof AggregateError ? cause
+      : nestedCause instanceof AggregateError ? nestedCause : undefined;
+    const rawAttempts = aggregate ? safeProperty(aggregate, 'errors') : undefined;
+    const attempts = Array.isArray(rawAttempts) ? rawAttempts.slice(0, MAX_ADDRESS_ATTEMPTS)
+      : cause && typeof cause === 'object' ? [cause] : [];
+    if (!attempts.length) return undefined;
+
+    const attemptOutcomes = attempts.map((attempt) => {
+      const family = familyFromAttempt(attempt);
+      return family ? { family, outcome: outcomeFromAttempt(attempt) } : undefined;
+    }).filter(Boolean);
+    const addressFamilies = [...new Set(attemptOutcomes.map(({ family }) => family))];
+    const result = {
+      multiAddress: Boolean(aggregate),
+      attemptCount: attempts.length,
+    };
+    if (addressFamilies.length) result.addressFamilies = addressFamilies;
+    if (attemptOutcomes.length) result.attemptOutcomes = attemptOutcomes;
+    return result;
+  } catch {
+    return undefined;
+  }
 }
 
 function createProviderDiagnostics(requestId, write = (message, meta) => logger.info(message, meta)) {
@@ -77,9 +143,26 @@ function createProviderDiagnostics(requestId, write = (message, meta) => logger.
       if (errorCode !== undefined) meta.errorCode = errorCode;
       if (SAFE_ERROR_CLASSES.has(event.errorClass)) meta.errorClass = event.errorClass;
       if (NETWORK_CLASSES.has(event.networkClass)) meta.networkClass = event.networkClass;
+      if (typeof event.multiAddress === 'boolean') meta.multiAddress = event.multiAddress;
+      const attemptCount = safeInteger(event.attemptCount, { min: 1, max: MAX_ADDRESS_ATTEMPTS });
+      if (attemptCount !== undefined) meta.attemptCount = attemptCount;
+      if (Array.isArray(event.addressFamilies)) {
+        const addressFamilies = [...new Set(event.addressFamilies.slice(0, MAX_ADDRESS_ATTEMPTS)
+          .filter((value) => ADDRESS_FAMILIES.has(value)))];
+        if (addressFamilies.length) meta.addressFamilies = addressFamilies;
+      }
+      if (Array.isArray(event.attemptOutcomes)) {
+        const attemptOutcomes = event.attemptOutcomes.slice(0, MAX_ADDRESS_ATTEMPTS).map((item) => {
+          const family = safeProperty(item, 'family');
+          const outcome = safeProperty(item, 'outcome');
+          if (!ADDRESS_FAMILIES.has(family) || !ATTEMPT_OUTCOMES.has(outcome)) return undefined;
+          return { family, outcome };
+        }).filter(Boolean);
+        if (attemptOutcomes.length) meta.attemptOutcomes = attemptOutcomes;
+      }
       write('Nearby provider diagnostic', meta);
     },
   };
 }
 
-module.exports = { createProviderDiagnostics, safeErrorClass, classifyNetworkError };
+module.exports = { createProviderDiagnostics, safeErrorClass, classifyNetworkError, classifyAddressFamilyAttempts };
