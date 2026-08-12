@@ -1,5 +1,6 @@
 const { GatewayError } = require('../errors');
 const { getCategory } = require('../categories');
+const { safeErrorClass } = require('../providerDiagnostics');
 
 function escapeOverpass(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -52,14 +53,18 @@ function createOverpassProvider(env, options = {}) {
     normalizeResult: normalizeOsmElement,
     async healthCheck() { return { configured: this.configured, healthy: this.configured }; },
     async getPlaceDetails() { throw new GatewayError('PROVIDER_UNAVAILABLE', 'OSM place details are deferred.'); },
-    async searchNearby(params) {
+    async searchNearby(params, context = {}) {
       if (!this.configured) throw new GatewayError('PROVIDER_NOT_CONFIGURED', 'OpenStreetMap Overpass is not configured.');
+      const diagnostics = context.diagnostics || { emit() {} };
       const query = buildQuery(params);
       let lastError;
       for (let attempt = 0; attempt < 2; attempt += 1) {
+        const attemptNumber = attempt + 1;
+        const startedAt = Date.now();
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), env.gateway.providerTimeoutMs);
         try {
+          diagnostics.emit({ provider: 'osm', stage: 'request', attempt: attemptNumber });
           const response = await fetchImpl(env.providers.overpassApiUrl, {
             method: 'POST',
             headers: {
@@ -70,18 +75,35 @@ function createOverpassProvider(env, options = {}) {
             body: new URLSearchParams({ data: query }).toString(),
             signal: controller.signal,
           });
+          diagnostics.emit({ provider: 'osm', stage: 'http_response', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, upstreamStatus: response.status });
           if (response.status === 429 || response.status >= 500) {
             lastError = new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap Overpass is temporarily unavailable.');
             if (attempt === 0) { await sleep(100); continue; }
             throw lastError;
           }
           if (!response.ok) throw new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap Overpass is unavailable.');
-          const payload = await response.json();
-          if (!Array.isArray(payload?.elements)) throw new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap returned an invalid response.');
-          return payload.elements.map((item) => normalizeOsmElement(item, params));
+          let payload;
+          try {
+            payload = await response.json();
+          } catch (error) {
+            diagnostics.emit({ provider: 'osm', stage: 'parse', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, errorCode: 'INVALID_JSON', errorClass: safeErrorClass(error) });
+            throw new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap returned invalid JSON.');
+          }
+          if (!Array.isArray(payload?.elements)) {
+            diagnostics.emit({ provider: 'osm', stage: 'parse', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, errorCode: 'INVALID_ENVELOPE' });
+            throw new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap returned an invalid response.');
+          }
+          diagnostics.emit({ provider: 'osm', stage: 'parse', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, resultCount: payload.elements.length });
+          const results = payload.elements.map((item) => normalizeOsmElement(item, params));
+          diagnostics.emit({ provider: 'osm', stage: 'normalization', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, resultCount: results.length });
+          return results;
         } catch (error) {
           if (error instanceof GatewayError) throw error;
-          if (error?.name === 'AbortError') throw new GatewayError('PROVIDER_TIMEOUT', 'OpenStreetMap Overpass timed out.');
+          if (error?.name === 'AbortError') {
+            diagnostics.emit({ provider: 'osm', stage: 'provider_failure', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, errorCode: 'PROVIDER_TIMEOUT', errorClass: 'AbortError' });
+            throw new GatewayError('PROVIDER_TIMEOUT', 'OpenStreetMap Overpass timed out.');
+          }
+          diagnostics.emit({ provider: 'osm', stage: 'provider_failure', attempt: attemptNumber, elapsedMs: Date.now() - startedAt, errorCode: 'PROVIDER_UNAVAILABLE', errorClass: safeErrorClass(error) });
           throw new GatewayError('PROVIDER_UNAVAILABLE', 'OpenStreetMap Overpass is unavailable.');
         } finally {
           clearTimeout(timer);

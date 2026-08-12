@@ -14,6 +14,7 @@
     "test:location": "node tests/location_foundation.js",
     "test:gateway": "node tests/backend_gateway.js && node tests/mobile_api_client.js",
     "test:nearby": "node tests/nearby_provider.js",
+    "test:observability": "node tests/provider_observability.js",
     "test:nearby:cities": "node tests/nearby_city_qa.js",
     "test:postgis": "node tests/postgis_verified_services.js",
     "test:security:notifications": "node tests/milestone5b_notifications.js",

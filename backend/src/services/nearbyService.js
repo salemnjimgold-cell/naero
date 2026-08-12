@@ -4,6 +4,7 @@ const { normalizeResult, deduplicate, rank } = require('../gateway/nearbyCore');
 const { createGooglePlacesProvider } = require('../gateway/providers/googlePlaces');
 const { createOverpassProvider } = require('../gateway/providers/overpass');
 const { createVerifiedServicesProvider } = require('../gateway/providers/verifiedServices');
+const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
 
 function createNearbyService(env, options = {}) {
   const providers = options.providers || [
@@ -13,41 +14,74 @@ function createNearbyService(env, options = {}) {
   ];
   const cache = options.cache || createNearbyCache(env.gateway.nearbyCache || { ttlMs: 300000, staleMs: 1800000 });
   const circuit = new Map();
+  const now = options.now || Date.now;
 
-  function canCall(provider, now = Date.now()) {
+  function callState(provider, currentTime = now()) {
     const state = circuit.get(provider.name);
-    return !state || state.failures < 3 || now >= state.openUntil;
+    return {
+      allowed: !state || state.failures < 3 || currentTime >= state.openUntil,
+      probe: Boolean(state && state.failures >= 3 && currentTime >= state.openUntil),
+    };
   }
-  function record(provider, ok, now = Date.now()) {
-    if (ok) { circuit.delete(provider.name); return; }
+  function record(provider, ok, diagnostics, currentTime = now()) {
+    const previous = circuit.get(provider.name);
+    const previousFailures = previous?.failures || 0;
+    if (ok) {
+      circuit.delete(provider.name);
+      if (previous?.failures >= 3) diagnostics.emit({ provider: provider.name, stage: 'circuit_closed' });
+      return;
+    }
     const state = circuit.get(provider.name) || { failures: 0, openUntil: 0 };
     state.failures += 1;
-    if (state.failures >= 3) state.openUntil = now + 30000;
+    if (state.failures >= 3) {
+      state.openUntil = currentTime + 30000;
+      diagnostics.emit({ provider: provider.name, stage: 'circuit_open', errorCode: previousFailures >= 3 ? 'CIRCUIT_REOPENED' : 'CIRCUIT_THRESHOLD' });
+    }
     circuit.set(provider.name, state);
   }
 
   return {
     providers,
     cache,
-    async searchNearby(params) {
+    async searchNearby(params, context = {}) {
+      const diagnostics = createProviderDiagnostics(context.requestId, options.providerDiagnosticsLogger);
       const fresh = cache.get(params);
       if (fresh) return { ...fresh.value, cached: true, stale: false };
 
-      const configured = providers.filter((provider) => provider.configured && canCall(provider));
+      const configured = [];
+      for (const provider of providers) {
+        if (!provider.configured) {
+          diagnostics.emit({ provider: provider.name, stage: 'provider_failure', errorCode: 'PROVIDER_NOT_CONFIGURED' });
+          continue;
+        }
+        const state = callState(provider);
+        if (!state.allowed) {
+          diagnostics.emit({ provider: provider.name, stage: 'circuit_open', errorCode: 'CIRCUIT_OPEN' });
+          continue;
+        }
+        if (state.probe) diagnostics.emit({ provider: provider.name, stage: 'circuit_probe' });
+        configured.push(provider);
+      }
       if (!configured.length) throw new GatewayError('PROVIDER_NOT_CONFIGURED', 'No nearby provider is configured.');
 
       const raw = [];
       const failures = [];
       const used = [];
       for (const provider of configured) {
+        const startedAt = now();
+        diagnostics.emit({ provider: provider.name, stage: 'provider_start' });
         try {
-          const results = await provider.searchNearby(params);
-          record(provider, true);
+          const results = await provider.searchNearby(params, { diagnostics });
+          const elapsedMs = Math.max(0, now() - startedAt);
+          diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: Array.isArray(results) ? results.length : 0 });
+          record(provider, true, diagnostics);
           used.push(provider.name);
           raw.push(...results);
           if (provider.name === 'google' && raw.length >= params.limit) break;
         } catch (error) {
-          record(provider, false);
+          const elapsedMs = Math.max(0, now() - startedAt);
+          diagnostics.emit({ provider: provider.name, stage: 'provider_failure', elapsedMs, errorCode: error?.code, errorClass: safeErrorClass(error) });
+          record(provider, false, diagnostics);
           failures.push(error);
         }
       }
