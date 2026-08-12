@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "id": "osm-overpass",
+    "provider": "osm",
+    "attribution": "© OpenStreetMap contributors",
+    "licence": "ODbL-1.0",
+    "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "copyrightUrl": "https://www.openstreetmap.org/copyright"
+  },
+  "target": {
+    "id": "gyor",
+    "city": "Győr",
+    "countryCode": "HU",
+    "category": "hospital",
+    "latitude": 47.6875,
+    "longitude": 17.6504,
+    "radius": 15000
+  },
+  "acquiredAt": "2026-08-12T16:38:28.923Z",
+  "queryFingerprint": "726a7925e24478a93762806a0737f3a5f0fafcdfc1b5180e72b8b9fb0d053afb",
+  "candidates": [
+    {
+      "provider": "osm",
+      "providerId": "node/13196085156",
+      "sourceReference": "https://www.openstreetmap.org/node/13196085156",
+      "category": "hospital",
+      "latitude": 47.6719536,
+      "longitude": 17.6495359,
+      "fields": {
+        "name": "Izotópdiagnosztika",
+        "description": null,
+        "organizationName": null,
+        "address": null,
+        "city": "Győr",
+        "district": null,
+        "region": null,
+        "postalCode": null,
+        "countryCode": "HU",
+        "phone": null,
+        "email": null,
+        "website": null,
+        "openingHours": null,
+        "accessibility": null
+      },
+      "fieldProvenance": {
+        "name": "osm_tag",
+        "city": "target_context",
+        "countryCode": "target_context"
+      },
+      "classification": "accepted",
+      "reasonCode": null,
+      "duplicateOf": null,
+      "elementType": "node"
+    },
+    {
+      "provider": "osm",
+      "providerId": "node/3441411607",
+      "sourceReference": "https://www.openstreetmap.org/node/3441411607",
+      "category": "hospital",
+      "latitude": 47.645687,
+      "longitude": 17.730706,
+      "fields": {
+        "name": "Dr. Piróth Endre Mentálhigiénés Otthon",
+        "description": null,
+        "organizationName": null,
+        "address": null,
+        "city": "Győr",
+        "district": null,
+        "region": null,
+        "postalCode": null,
+        "countryCode": "HU",
+        "phone": null,
+        "email": null,
+        "website": null,
+        "openingHours": null,
+        "accessibility": null
+      },
+      "fieldProvenance": {
+        "name": "osm_tag",
+        "city": "target_context",
+        "countryCode": "target_context"
+      },
+      "classification": "accepted",
+      "reasonCode": null,
+      "duplicateOf": null,
+      "elementType": "node"
+    },
+    {
+      "provider": "osm",
+      "providerId": "relation/17259397",
+      "sourceReference": "https://www.openstreetmap.org/relation/17259397",
+      "category": "hospital",
+      "latitude": 47.6677154,
+      "longitude": 17.6488837,
+      "fields": {
+        "name": "Mentőállomás",
+        "description": null,
+        "organizationName": null,
+        "address": null,
+        "city": "Győr",
+        "district": null,
+        "region": null,
+        "postalCode": null,
+        "countryCode": "HU",
+        "phone": null,
+        "email": null,
+        "website": null,
+        "openingHours": null,
+        "accessibility": null
+      },
+      "fieldProvenance": {
+        "name": "osm_tag",
+        "city": "target_context",
+        "countryCode": "target_context"
+      },
+      "classification": "accepted",
+      "reasonCode": null,
+      "duplicateOf": null,
+      "elementType": "relation"
+    },
+    {
+      "provider": "osm",
+      "providerId": "relation/2418104",
+      "sourceReference": "https://www.openstreetmap.org/relation/2418104",
+      "category": "hospital",
+      "latitude": 47.672161,
+      "longitude": 17.6489274,
+      "fields": {
+        "name": "Petz Aladár Megyei Oktató Kórház",
+        "description": null,
+        "organizationName": null,
+        "address": null,
+        "city": "Győr",
+        "district": null,
+        "region": null,
+        "postalCode": null,
+        "countryCode": "HU",
+        "phone": null,
+        "email": null,
+        "website": null,
+        "openingHours": null,
+        "accessibility": null
+      },
+      "fieldProvenance": {
+        "name": "osm_tag",
+        "city": "target_context",
+        "countryCode": "target_context"
+      },
+      "classification": "accepted",
+      "reasonCode": null,
+      "duplicateOf": null,
+      "elementType": "relation"
+    },
+    {
+      "provider": "osm",
+      "providerId": "way/211374321",
+      "sourceReference": "https://www.openstreetmap.org/way/211374321",
+      "category": "hospital",
+      "latitude": 47.687475,
+      "longitude": 17.6267296,
+      "fields": {
+        "name": "Petz Aladár Megyei Oktató Kórház - Reumatológiai Osztály",
+        "description": null,
+        "organizationName": null,
+        "address": null,
+        "city": "Győr",
+        "district": null,
+        "region": null,
+        "postalCode": null,
+        "countryCode": "HU",
+        "phone": null,
+        "email": null,
+        "website": null,
+        "openingHours": null,
+        "accessibility": "yes"
+      },
+      "fieldProvenance": {
+        "name": "osm_tag",
+        "city": "target_context",
+        "countryCode": "target_context",
+        "accessibility": "osm_tag"
+      },
+      "classification": "accepted",
+      "reasonCode": null,
+      "duplicateOf": null,
+      "elementType": "way"
+    }
+  ],
+  "counts": {
+    "raw": 5,
+    "normalized": 5,
+    "accepted": 5,
+    "rejected": 0,
+    "duplicate": 0,
+    "ambiguous": 0
+  },
+  "digest": "d99f6ac4823f9879580d0639085a754e2e5a516d5fc4f0912e8bb43bfd43e7a8"
+}
