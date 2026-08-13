@@ -69,6 +69,7 @@ function readEnv(source = process.env) {
       debugLocationLogging: mergedSource.DEBUG_LOCATION_LOGGING === 'true' && mergedSource.NODE_ENV !== 'production',
     },
     providers: {
+      geoapifyApiKey: mergedSource.GEOAPIFY_API_KEY || '',
       googlePlacesApiKey: mergedSource.GOOGLE_PLACES_API_KEY || '',
       googleMapsApiKey: mergedSource.GOOGLE_MAPS_API_KEY || '',
       nominatimBaseUrl: mergedSource.NOMINATIM_BASE_URL || '',
