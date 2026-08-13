@@ -4,7 +4,7 @@ function createNearbyCache({ ttlMs, staleMs }) {
     return [
       Math.round(params.latitude * 100) / 100,
       Math.round(params.longitude * 100) / 100,
-      params.category, params.radius, params.language, params.limit,
+      params.category, params.radius, params.language, params.countryCode || '', params.limit,
     ].join('|');
   }
   return {

@@ -19,6 +19,21 @@ function stableId(provider, providerId, latitude, longitude, name) {
   const key = `${provider}|${providerId || ''}|${latitude.toFixed(5)}|${longitude.toFixed(5)}|${normalizeName(name)}`;
   return `${provider}:${createHash('sha256').update(key).digest('hex').slice(0, 20)}`;
 }
+function safeLineage(raw) {
+  const sourceRole = ['VERIFIED', 'DISCOVERED', 'LIVE'].includes(raw.sourceRole) ? raw.sourceRole : 'LIVE';
+  return [{
+    provider: clean(raw.provider),
+    providerId: clean(raw.providerId),
+    sourceRole,
+    fetchedAt: clean(raw.fetchedAt),
+    verifiedAt: clean(raw.lastVerifiedAt),
+    attribution: clean(raw.sourceAttribution),
+  }];
+}
+function setLineage(item, lineage) {
+  Object.defineProperty(item, '_lineage', { value: lineage, enumerable: false, configurable: true });
+  return item;
+}
 function normalizeResult(raw, context) {
   const latitude = Number(raw.latitude);
   const longitude = Number(raw.longitude);
@@ -58,7 +73,7 @@ function normalizeResult(raw, context) {
     value: Array.isArray(raw.providerLinks) ? raw.providerLinks : [],
     enumerable: false,
   });
-  return result;
+  return setLineage(result, safeLineage(raw));
 }
 function completeness(item) {
   return ['address', 'city', 'phone', 'website', 'openingHours', 'isOpenNow'].reduce((n, key) => n + (item[key] !== null ? 1 : 0), 0);
@@ -84,7 +99,9 @@ function mergePreferred(a, b) {
   const merged = { ...other, ...preferred };
   for (const key of Object.keys(merged)) if (merged[key] === null && other[key] !== null) merged[key] = other[key];
   merged.sourceAttribution = [...new Set([a.sourceAttribution, b.sourceAttribution].filter(Boolean))].join('; ');
-  return merged;
+  const lineage = [...(a._lineage || []), ...(b._lineage || [])].filter((entry, index, all) =>
+    all.findIndex((candidate) => candidate.provider === entry.provider && candidate.providerId === entry.providerId) === index);
+  return setLineage(merged, lineage);
 }
 function deduplicate(items) {
   return items.reduce((result, item) => {

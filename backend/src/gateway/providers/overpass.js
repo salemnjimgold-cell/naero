@@ -48,6 +48,7 @@ function createOverpassProvider(env, options = {}) {
   const sleep = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   return {
     name: 'osm',
+    sourceRole: 'LIVE',
     configured: Boolean(env.providers.overpassApiUrl),
     mapCategory: getCategory,
     normalizeResult: normalizeOsmElement,

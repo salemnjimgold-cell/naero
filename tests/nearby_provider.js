@@ -12,7 +12,7 @@ const env = {
   gateway: { providerTimeoutMs: 15, nearbyCache: { ttlMs: 1000, staleMs: 5000 } },
   providers: { googlePlacesApiKey: '', overpassApiUrl: '' },
 };
-const params = { latitude: 47.4979, longitude: 19.0402, radius: 5000, limit: 20, category: 'hospital', language: 'en' };
+const params = { latitude: 47.4979, longitude: 19.0402, radius: 5000, limit: 20, category: 'hospital', language: 'en', countryCode: 'HU' };
 const tests = [];
 function test(name, fn) { tests.push({ name, fn }); }
 function raw(overrides = {}) {
@@ -133,6 +133,44 @@ test('Google timeout falls back to Overpass', async () => {
   assert.equal(result.items.length, 1);
   assert.equal(result.partial, true);
 });
+test('sufficient verified results stop before live providers', async () => {
+  let liveCalls = 0;
+  const verified = Array.from({ length: 2 }, (_, index) => raw({ provider: 'naero', providerId: `verified-${index}`, name: `Verified ${index}`, verified: true }));
+  const providers = [
+    { name: 'naero', sourceRole: 'VERIFIED', configured: true, searchNearby: async () => verified },
+    { name: 'google', sourceRole: 'LIVE', configured: true, searchNearby: async () => { liveCalls += 1; return []; } },
+  ];
+  const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 2 });
+  assert.equal(result.items.length, 2); assert.equal(liveCalls, 0);
+  assert.deepEqual(result.sourcesAttempted, ['naero']); assert.equal(result.coverageStatus, 'sufficient');
+});
+test('insufficient verified results call live provider only for remaining coverage', async () => {
+  let googleCalls = 0; let osmCalls = 0;
+  const providers = [
+    { name: 'naero', sourceRole: 'VERIFIED', configured: true, searchNearby: async () => [raw({ provider: 'naero', providerId: 'v1', name: 'Verified', verified: true })] },
+    { name: 'google', sourceRole: 'LIVE', configured: true, searchNearby: async () => { googleCalls += 1; return [raw({ provider: 'google', providerId: 'g1', name: 'Other Hospital', latitude: 47.501 })]; } },
+    { name: 'osm', sourceRole: 'LIVE', configured: true, searchNearby: async () => { osmCalls += 1; return []; } },
+  ];
+  const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 2 });
+  assert.equal(result.items.length, 2); assert.equal(googleCalls, 1); assert.equal(osmCalls, 0);
+});
+test('provider failure plus usable results returns truthful partial success', async () => {
+  const providers = [
+    { name: 'naero', sourceRole: 'VERIFIED', configured: true, searchNearby: async () => [raw({ provider: 'naero', providerId: 'v1', verified: true })] },
+    { name: 'google', sourceRole: 'LIVE', configured: true, searchNearby: async () => { throw Object.assign(new Error(), { code: 'PROVIDER_UNAVAILABLE' }); } },
+  ];
+  const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 2 });
+  assert.equal(result.items.length, 1); assert.equal(result.partial, true); assert.equal(result.coverageStatus, 'partial');
+  assert.deepEqual(result.sourcesSucceeded, ['naero']);
+});
+test('genuine successful empty response differs from total provider failure', async () => {
+  const empty = await createNearbyService(env, { providers: [{ name: 'osm', configured: true, searchNearby: async () => [] }] }).searchNearby(params);
+  assert.deepEqual(empty.items, []); assert.equal(empty.coverageStatus, 'exhausted'); assert.equal(empty.partial, false);
+  await assert.rejects(
+    () => createNearbyService(env, { providers: [{ name: 'osm', configured: true, searchNearby: async () => { throw Object.assign(new Error(), { code: 'PROVIDER_UNAVAILABLE' }); } }] }).searchNearby(params),
+    (error) => error.code === 'PROVIDER_UNAVAILABLE',
+  );
+});
 test('Google quota error falls back to Overpass', async () => {
   const providers = [
     { name: 'google', configured: true, searchNearby: async () => { throw Object.assign(new Error(), { code: 'PROVIDER_UNAVAILABLE' }); } },
@@ -152,12 +190,33 @@ test('cache key rounds exact coordinates', () => {
   const cache = createNearbyCache({ ttlMs: 1000, staleMs: 5000 });
   assert.equal(cache.key(params), cache.key({ ...params, latitude: params.latitude + 0.00001 }));
 });
+test('cache key isolates country codes', () => {
+  const cache = createNearbyCache({ ttlMs: 1000, staleMs: 5000 });
+  assert.notEqual(cache.key({ ...params, countryCode: 'AT' }), cache.key({ ...params, countryCode: 'HU' }));
+  cache.set({ ...params, countryCode: 'AT' }, { marker: 'austria' });
+  assert.equal(cache.get({ ...params, countryCode: 'HU' }), null);
+});
+test('normalized lineage is structured, private, and preserved through deduplication', () => {
+  const verified = core.normalizeResult(raw({ provider: 'naero', providerId: 'v1', sourceRole: 'VERIFIED', verified: true }), params);
+  const live = core.normalizeResult(raw({ provider: 'osm', providerId: 'node/2', sourceRole: 'LIVE' }), params);
+  const merged = core.deduplicate([verified, live])[0];
+  assert.deepEqual(merged._lineage.map((item) => item.sourceRole).sort(), ['LIVE', 'VERIFIED']);
+  assert.equal(JSON.stringify(merged).includes('_lineage'), false);
+});
+test('resolver diagnostics do not contain coordinates, query strings, or secrets', async () => {
+  const events = [];
+  const providers = [{ name: 'osm', sourceRole: 'LIVE', configured: true, searchNearby: async () => [raw()] }];
+  await createNearbyService(env, { providers, providerDiagnosticsLogger: (_message, event) => events.push(event) }).searchNearby(params, { requestId: 'safe-request' });
+  const serialized = JSON.stringify(events);
+  assert.doesNotMatch(serialized, /47\.4979|19\.0402|latitude|longitude|apiKey|token|authorization|\?.*=/i);
+  assert.match(serialized, /safe-request/);
+});
 test('stale cache fallback is returned after provider failure', async () => {
   const cache = createNearbyCache({ ttlMs: 0, staleMs: 5000 });
   cache.set(params, { items: [core.normalizeResult(raw(), params)], providers: ['osm'], attributions: ['OSM'], partial: false }, Date.now() - 5);
   const providers = [{ name: 'osm', configured: true, searchNearby: async () => { throw Object.assign(new Error(), { code: 'PROVIDER_TIMEOUT' }); } }];
   const result = await createNearbyService(env, { providers, cache }).searchNearby(params);
-  assert.equal(result.stale, true);
+  assert.equal(result.stale, true); assert.equal(result.coverageStatus, 'stale'); assert.equal(result.partial, true);
 });
 test('request cancellation normalizes as provider timeout', async () => {
   const configuredEnv = { ...env, providers: { ...env.providers, overpassApiUrl: 'https://example.test' } };

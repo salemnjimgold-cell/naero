@@ -72,6 +72,7 @@ function createVerifiedServicesProvider(env, options = {}) {
   }
   return {
     name: 'naero',
+    sourceRole: 'VERIFIED',
     configured,
     mapCategory: getCategory,
     normalizeResult: normalizeVerifiedService,

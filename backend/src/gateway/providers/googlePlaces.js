@@ -38,6 +38,7 @@ function createGooglePlacesProvider(env, options = {}) {
   const fetchImpl = options.fetchImpl || fetch;
   return {
     name: 'google',
+    sourceRole: 'LIVE',
     configured: Boolean(env.providers.googlePlacesApiKey),
     mapCategory: getCategory,
     normalizeResult: normalizeGooglePlace,

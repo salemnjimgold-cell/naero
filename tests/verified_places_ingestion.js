@@ -2,8 +2,14 @@ const assert = require('node:assert/strict');
 const { createManifest, validateManifest, digestContent, normalizeElement, stableStringify } = require('../backend/src/ingestion/manifest');
 const { acquire, MAX_RESPONSE_BYTES } = require('../backend/src/ingestion/acquire');
 const { getTarget } = require('../backend/src/ingestion/targets');
-const { parseArgs } = require('../backend/scripts/verifiedPlacesCli');
-const { requireApplyAuthorization, applyManifest, approveServices } = require('../backend/src/ingestion/workflow');
+const { parseArgs, main: ingestionMain } = require('../backend/scripts/verifiedPlacesCli');
+const {
+  requireApplyAuthorization, requireApprovalAuthorization, applyManifest, approveServices, applyReviewedBatch,
+  preflightReviewedApproval, approveReviewedBatch, preflightReviewedRecovery,
+} = require('../backend/src/ingestion/workflow');
+const { EXPECTED_REVIEW_DIGEST, reviewDigest, validateReviewedBatch } = require('../backend/src/ingestion/reviewedBatch');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const tests = [];
 function test(name, fn) { tests.push({ name, fn }); }
@@ -27,6 +33,7 @@ test('CLI rejects arbitrary URL, coordinates, city, and category arguments', () 
   assert.throws(() => parseArgs(['acquire', '--url', 'https://example.test']), /Unsupported/);
   assert.throws(() => parseArgs(['acquire', '--latitude', '1']), /Unsupported/);
   assert.rejects(() => acquire({ city: 'other', category: 'hospital', fetchImpl: async () => response({ elements: [] }) }), (error) => error.code === 'UNSUPPORTED_TARGET');
+  assert.throws(() => parseArgs(['apply', '--manifest', 'acquisition.json']), /Unsupported/);
 });
 test('acquisition rejects non-2xx, oversized, invalid JSON and invalid envelope', async () => {
   await assert.rejects(() => acquire({ city: 'vienna', category: 'hospital', fetchImpl: async () => response({}, { ok: false, status: 503 }) }), (error) => error.code === 'UPSTREAM_HTTP_ERROR');
@@ -77,7 +84,13 @@ test('canonical serialization ignores hostile inherited getters', () => {
 });
 
 class MemoryRepository {
-  constructor(failAt = null) { this.state = { services: [], links: [], logs: [] }; this.failAt = failAt; }
+  constructor(failAt = null) { this.state = { services: [], links: [], logs: [], batches: [] }; this.failAt = failAt; }
+  async listReviewedBatch(digest) {
+    return this.state.batches.filter((item) => item.digest === digest).map((item) => {
+      const service = this.state.services.find((row) => row.id === item.serviceId);
+      return { ...item, verificationStatus: service?.status };
+    });
+  }
   async transaction(callback) {
     const original = structuredClone(this.state); let calls = 0;
     const fail = () => { calls += 1; if (calls === this.failAt) throw new Error('isolated failure'); };
@@ -88,28 +101,102 @@ class MemoryRepository {
       insertLog: async (serviceId, action, status) => { fail(); this.state.logs.push({ serviceId, action, status }); },
       markPending: async (id) => { fail(); this.state.services.find((row) => row.id === id).status = 'pending'; },
       approve: async (id, details) => { fail(); Object.assign(this.state.services.find((row) => row.id === id), { status: 'approved', ...details }); },
+      registerReviewedBatch: async (serviceId, digest, provider, providerId) => {
+        fail();
+        if (!this.state.batches.some((item) => item.digest === digest && item.provider === provider && item.providerId === providerId)) {
+          this.state.batches.push({ serviceId, digest, provider, providerId });
+        }
+      },
+      listReviewedBatch: async (digest) => this.listReviewedBatch(digest),
     };
     try { return await callback(tx); } catch (error) { this.state = original; throw error; }
   }
 }
-const auth = { production: true, expectedProject: 'rqsqmepxjkgfgvrkwvhn', reviewedDigest: manifest().digest, operatorId: 'operator', credential: 'runtime-only' };
+const artifactRoot = path.resolve(process.cwd(), 'docs/recovery/milestone-3d/phase-2b');
+const review = JSON.parse(fs.readFileSync(path.join(artifactRoot, 'verified-places.review.json'), 'utf8'));
+const sourceManifests = {
+  vienna: JSON.parse(fs.readFileSync(path.join(artifactRoot, 'vienna-hospitals.manifest.json'), 'utf8')),
+  gyor: JSON.parse(fs.readFileSync(path.join(artifactRoot, 'gyor-hospitals.manifest.json'), 'utf8')),
+};
+test('CLI validates the reviewed batch and remains production-write disabled', async () => {
+  await assert.rejects(() => ingestionMain([
+    'apply', '--review', path.join(artifactRoot, 'verified-places.review.json'),
+    '--vienna-manifest', path.join(artifactRoot, 'vienna-hospitals.manifest.json'),
+    '--gyor-manifest', path.join(artifactRoot, 'gyor-hospitals.manifest.json'),
+    '--production', 'true', '--expected-project', 'rqsqmepxjkgfgvrkwvhn',
+    '--reviewed-digest', EXPECTED_REVIEW_DIGEST, '--operator', 'operator',
+  ]), (error) => error.code === 'PRODUCTION_WRITE_DISABLED');
+});
+const auth = { production: true, expectedProject: 'rqsqmepxjkgfgvrkwvhn', reviewedDigest: EXPECTED_REVIEW_DIGEST, operatorId: 'operator', credential: 'runtime-only' };
 test('apply safety gates fail closed', () => {
   for (const key of ['production', 'expectedProject', 'reviewedDigest', 'operatorId', 'credential']) assert.throws(() => requireApplyAuthorization({ ...auth, [key]: null }));
+  const approvalAuth = { ...auth, reviewerId: 'reviewer' };
+  for (const key of ['production', 'expectedProject', 'reviewedDigest', 'reviewerId', 'credential']) assert.throws(() => requireApprovalAuthorization({ ...approvalAuth, [key]: null }));
 });
-test('apply creates draft/link/log/pending and repeated apply is idempotent', async () => {
-  const repo = new MemoryRepository(); const value = manifest();
-  await applyManifest(value, { ...auth, reviewedDigest: value.digest }, repo); await applyManifest(value, { ...auth, reviewedDigest: value.digest }, repo);
-  assert.equal(repo.state.services.length, 1); assert.equal(repo.state.links.length, 1); assert.equal(repo.state.services[0].status, 'pending');
+test('legacy acquisition apply and arbitrary approval fail closed', async () => {
+  assert.throws(() => applyManifest(manifest(), auth, new MemoryRepository()), (error) => error.code === 'REVIEW_ARTIFACT_REQUIRED');
+  assert.throws(() => approveServices(['arbitrary-service'], { reviewerId: 'reviewer' }, new MemoryRepository()), (error) => error.code === 'REVIEW_ARTIFACT_REQUIRED');
+});
+test('canonical review creates exactly 18 Vienna and 1 Gyor candidates', () => {
+  const batch = validateReviewedBatch(review, sourceManifests);
+  assert.equal(reviewDigest(review), EXPECTED_REVIEW_DIGEST);
+  assert.equal(batch.candidates.length, 19); assert.deepEqual(batch.targetAccepts, { vienna: 18, gyor: 1 });
+  assert.deepEqual(batch.counts, { ACCEPT: 19, HOLD: 5, REJECT: 2, OUT_OF_TARGET: 2, CHILD_FACILITY: 5 });
+  assert.ok(batch.candidates.every((item) => item.review.decision === 'ACCEPT'));
+});
+test('review digest, missing record, duplicate identity and manifest tampering fail closed', () => {
+  const wrongDigest = structuredClone(review); wrongDigest.reviewDigest = '0'.repeat(64);
+  assert.throws(() => validateReviewedBatch(wrongDigest, sourceManifests), (error) => error.code === 'REVIEW_DIGEST_MISMATCH');
+  const missing = structuredClone(review); missing.decisions.pop();
+  assert.throws(() => validateReviewedBatch(missing, sourceManifests), (error) => error.code === 'REVIEW_DIGEST_MISMATCH' || error.code === 'REVIEW_DECISION_COUNT_MISMATCH');
+  const duplicate = structuredClone(review); duplicate.decisions[1] = structuredClone(duplicate.decisions[0]);
+  duplicate.reviewDigest = reviewDigest(duplicate);
+  assert.throws(() => validateReviewedBatch(duplicate, sourceManifests));
+  const tamperedManifests = structuredClone(sourceManifests); tamperedManifests.vienna.candidates[0].fields.name = 'Changed';
+  assert.throws(() => validateReviewedBatch(review, tamperedManifests), (error) => error.code === 'INVALID_SOURCE_MANIFEST');
+});
+test('reviewed display-name override is projected without mutating acquisition evidence', () => {
+  const before = stableStringify(sourceManifests);
+  const batch = validateReviewedBatch(review, sourceManifests);
+  const projected = batch.candidates.find((item) => item.providerId === 'way/23304539');
+  const acquired = sourceManifests.vienna.candidates.find((item) => item.providerId === 'way/23304539');
+  assert.equal(projected.fields.name, 'Traumazentrum Wien – Standort Meidling');
+  assert.notEqual(projected.fields.name, acquired.fields.name);
+  assert.equal(stableStringify(sourceManifests), before);
+});
+test('reviewed apply creates only the exact batch and is idempotent', async () => {
+  const repo = new MemoryRepository();
+  const first = await applyReviewedBatch(review, sourceManifests, auth, repo);
+  const second = await applyReviewedBatch(review, sourceManifests, auth, repo);
+  assert.equal(first.length, 19); assert.equal(second.length, 19);
+  assert.equal(repo.state.services.length, 19); assert.equal(repo.state.links.length, 19); assert.equal(repo.state.batches.length, 19);
+  assert.ok(repo.state.services.every((item) => item.status === 'pending'));
 });
 test('transaction rolls back every component failure', async () => {
-  const repo = new MemoryRepository(3); const value = manifest();
-  await assert.rejects(() => applyManifest(value, { ...auth, reviewedDigest: value.digest }, repo)); assert.deepEqual(repo.state, { services: [], links: [], logs: [] });
+  const repo = new MemoryRepository(3);
+  await assert.rejects(() => applyReviewedBatch(review, sourceManifests, auth, repo));
+  assert.deepEqual(repo.state, { services: [], links: [], logs: [], batches: [] });
 });
-test('approval is separate and assigns expiry', async () => {
-  const repo = new MemoryRepository(); const value = manifest();
-  await applyManifest(value, { ...auth, reviewedDigest: value.digest }, repo);
-  const result = await approveServices(['service-1'], { reviewerId: 'reviewer', verifiedAt: '2026-01-01T00:00:00Z' }, repo);
-  assert.equal(repo.state.services[0].status, 'approved'); assert.equal(result[0].expiresAt, '2026-06-30T00:00:00.000Z');
+test('approval derives exact linked batch, rejects missing/extra links, and is idempotent', async () => {
+  const repo = new MemoryRepository(); await applyReviewedBatch(review, sourceManifests, auth, repo);
+  const preflight = await preflightReviewedApproval(review, sourceManifests, repo); assert.equal(preflight.rows.length, 19);
+  const missing = structuredClone(repo.state.batches.pop());
+  await assert.rejects(() => preflightReviewedApproval(review, sourceManifests, repo), (error) => error.code === 'APPROVAL_BATCH_COUNT_MISMATCH');
+  repo.state.batches.push(missing, { ...missing, providerId: 'node/999999', serviceId: 'extra' });
+  await assert.rejects(() => preflightReviewedApproval(review, sourceManifests, repo), (error) => ['APPROVAL_BATCH_COUNT_MISMATCH', 'UNREVIEWED_APPROVAL_TARGET'].includes(error.code));
+  repo.state.batches.pop();
+  const options = { ...auth, reviewerId: 'reviewer', verifiedAt: '2026-01-01T00:00:00Z' };
+  const first = await approveReviewedBatch(review, sourceManifests, options, repo);
+  const second = await approveReviewedBatch(review, sourceManifests, options, repo);
+  assert.equal(first.length, 19); assert.ok(first.every((item) => item.expiresAt === '2026-06-30T00:00:00.000Z'));
+  assert.ok(second.every((item) => item.action === 'existing'));
+});
+test('recovery preflight is exact and never executes a mutation', async () => {
+  const repo = new MemoryRepository(); await applyReviewedBatch(review, sourceManifests, auth, repo);
+  const before = structuredClone(repo.state);
+  const recovery = await preflightReviewedRecovery(review, sourceManifests, repo);
+  assert.equal(recovery.mode, 'TRANSACTIONAL_DELETE_UNAPPROVED'); assert.equal(recovery.executable, false); assert.equal(recovery.serviceIds.length, 19);
+  assert.deepEqual(repo.state, before);
 });
 test('source contains no credentials or raw-response logging', () => {
   const all = [require.resolve('../backend/src/ingestion/acquire'), require.resolve('../backend/src/ingestion/manifest'), require.resolve('../backend/scripts/verifiedPlacesCli')].map((file) => require('node:fs').readFileSync(file, 'utf8')).join('\n');

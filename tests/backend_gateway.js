@@ -82,6 +82,24 @@ test('provider not configured returns honest error and no demo places', async ()
   });
 });
 
+test('nearby response remains backward compatible with additive resolver metadata', async () => {
+  await withServer({
+    gatewayOptions: {
+      nearbyService: {
+        searchNearby: async () => ({
+          items: [], providers: ['naero'], attributions: [], cached: false, stale: false, partial: false,
+          coverageStatus: 'exhausted', sourcesAttempted: ['naero'], sourcesSucceeded: ['naero'],
+        }),
+      },
+    },
+  }, async (base) => {
+    const { response, payload } = await get(base, '/api/v1/nearby?latitude=47.5&longitude=19&category=hospital');
+    assert.equal(response.status, 200); assert.equal(payload.success, true); assert.deepEqual(payload.data, []);
+    for (const field of ['source', 'cached', 'stale', 'partial', 'providers', 'attributions']) assert.ok(Object.hasOwn(payload.meta, field));
+    assert.equal(payload.meta.coverageStatus, 'exhausted'); assert.deepEqual(payload.meta.sourcesAttempted, ['naero']);
+  });
+});
+
 test('provider timeout is normalized', async () => {
   const fetchImpl = (_url, { signal }) => new Promise((_resolve, reject) => {
     signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));

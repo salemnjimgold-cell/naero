@@ -35,6 +35,9 @@ function createGatewayRoutes(env, options = {}) {
               partial: result.partial,
               providers: result.providers,
               attributions: result.attributions,
+              coverageStatus: result.coverageStatus,
+              sourcesAttempted: result.sourcesAttempted,
+              sourcesSucceeded: result.sourcesSucceeded,
             },
           });
         }
