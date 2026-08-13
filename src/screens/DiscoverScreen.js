@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { mockCategories } from '../data/providers/mockCategories';
+const { categoriesMatch } = require('../services/nearbyClientCore');
 
 const TAB_ICONS = {
   all: 'apps-outline',
@@ -151,7 +152,7 @@ export default function DiscoverScreen({ navigation }) {
     }
 
     if (activeCategory) {
-      results = results.filter((r) => r.category === activeCategory);
+      results = results.filter((r) => categoriesMatch(r.category, activeCategory));
     }
 
     if (search.trim()) {

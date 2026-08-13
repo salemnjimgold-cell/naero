@@ -6,7 +6,7 @@ const { createNearbyCache } = require('../backend/src/gateway/cache');
 const { createOverpassProvider, buildQuery, normalizeOsmElement } = require('../backend/src/gateway/providers/overpass');
 const { createGooglePlacesProvider, normalizeGooglePlace, FIELD_MASK } = require('../backend/src/gateway/providers/googlePlaces');
 const { createNearbyService } = require('../backend/src/services/nearbyService');
-const { gatewayCategory, createNearbyQuery } = require('../src/services/nearbyClientCore');
+const { CATEGORY_ALIASES, gatewayCategory, categoriesMatch, createNearbyQuery } = require('../src/services/nearbyClientCore');
 
 const env = {
   gateway: { providerTimeoutMs: 15, nearbyCache: { ttlMs: 1000, staleMs: 5000 } },
@@ -154,6 +154,37 @@ test('insufficient verified results call live provider only for remaining covera
   const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 2 });
   assert.equal(result.items.length, 2); assert.equal(googleCalls, 1); assert.equal(osmCalls, 0);
 });
+test('verified insufficient plus Geoapify sufficient skips Google and OSM', async () => {
+  let googleCalls = 0; let osmCalls = 0;
+  const providers = [
+    { name: 'naero', sourceRole: 'VERIFIED', configured: true, searchNearby: async () => [raw({ provider: 'naero', providerId: 'v1', name: 'Verified', verified: true })] },
+    { name: 'geoapify', sourceRole: 'LIVE', configured: true, searchNearby: async () => [raw({ provider: 'geoapify', providerId: 'g1', name: 'Geo One' }), raw({ provider: 'geoapify', providerId: 'g2', name: 'Geo Two', latitude: 47.501 })] },
+    { name: 'google', sourceRole: 'LIVE', configured: true, searchNearby: async () => { googleCalls += 1; return []; } },
+    { name: 'osm', sourceRole: 'LIVE', configured: true, searchNearby: async () => { osmCalls += 1; return []; } },
+  ];
+  const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 3 });
+  assert.equal(result.items.length, 3); assert.equal(googleCalls, 0); assert.equal(osmCalls, 0);
+  assert.deepEqual(result.sourcesAttempted, ['naero', 'geoapify']);
+});
+test('Geoapify insufficient permits the next eligible live provider', async () => {
+  let osmCalls = 0;
+  const providers = [
+    { name: 'geoapify', sourceRole: 'LIVE', configured: true, searchNearby: async () => [raw({ provider: 'geoapify', providerId: 'g1' })] },
+    { name: 'osm', sourceRole: 'LIVE', configured: true, searchNearby: async () => { osmCalls += 1; return [raw({ providerId: 'o1', name: 'Other', latitude: 47.501 })]; } },
+  ];
+  const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 2 });
+  assert.equal(result.items.length, 2); assert.equal(osmCalls, 1);
+});
+test('deduplication below the requested limit preserves legitimate fallback', async () => {
+  let osmCalls = 0;
+  const duplicate = raw({ provider: 'geoapify', providerId: 'same', name: 'Duplicate' });
+  const providers = [
+    { name: 'geoapify', sourceRole: 'LIVE', configured: true, searchNearby: async () => [duplicate, { ...duplicate }] },
+    { name: 'osm', sourceRole: 'LIVE', configured: true, searchNearby: async () => { osmCalls += 1; return [raw({ providerId: 'o2', name: 'Fallback', latitude: 47.501 })]; } },
+  ];
+  const result = await createNearbyService(env, { providers }).searchNearby({ ...params, limit: 2 });
+  assert.equal(result.items.length, 2); assert.equal(osmCalls, 1);
+});
 test('provider failure plus usable results returns truthful partial success', async () => {
   const providers = [
     { name: 'naero', sourceRole: 'VERIFIED', configured: true, searchNearby: async () => [raw({ provider: 'naero', providerId: 'v1', verified: true })] },
@@ -236,7 +267,22 @@ test('Discover exposes loading, error, stale and attribution states', () => {
   const source = fs.readFileSync(require.resolve('../src/screens/DiscoverScreen.js'), 'utf8');
   for (const token of ['loading', 'nearbyError', 'stale', 'attributions']) assert.match(source, new RegExp(token));
 });
-test('mobile category aliases map to backend registry keys', () => assert.equal(gatewayCategory('hospitals'), 'hospital'));
+test('mobile category aliases map to backend registry keys', () => {
+  assert.equal(gatewayCategory('hospitals'), 'hospital');
+  assert.equal(gatewayCategory('pharmacies'), 'pharmacy');
+  assert.equal(gatewayCategory('supermarkets'), 'supermarket');
+  for (const canonical of Object.values(CATEGORY_ALIASES)) assert.ok(CATEGORY_REGISTRY[canonical]);
+});
+test('Discover category matching retains canonical gateway records', () => {
+  assert.equal(categoriesMatch('hospital', 'hospitals'), true);
+  assert.equal(categoriesMatch('pharmacy', 'pharmacies'), true);
+  assert.equal(categoriesMatch('supermarket', 'supermarkets'), true);
+  assert.equal(categoriesMatch('hospital', 'pharmacies'), false);
+  assert.equal(categoriesMatch(null, 'hospitals'), false);
+  const source = fs.readFileSync(require.resolve('../src/screens/DiscoverScreen.js'), 'utf8');
+  assert.match(source, /categoriesMatch\(r\.category, activeCategory\)/);
+  assert.doesNotMatch(source, /r\.category === activeCategory/);
+});
 test('mobile nearby query includes bounded request fields', () => {
   const query = new URLSearchParams(createNearbyQuery({ latitude: 1, longitude: 2, radiusKm: 5, limit: 10, category: 'pharmacies', language: 'fr' }));
   assert.equal(query.get('radius'), '5000');
