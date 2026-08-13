@@ -1,7 +1,7 @@
 const { logger } = require('../observability/logger');
 const { isIP } = require('node:net');
 
-const PROVIDERS = new Set(['naero', 'google', 'osm']);
+const PROVIDERS = new Set(['naero', 'geoapify', 'google', 'osm']);
 const STAGES = new Set([
   'provider_start', 'request', 'http_response', 'parse', 'normalization',
   'provider_success', 'provider_failure', 'circuit_open', 'circuit_probe', 'circuit_closed',

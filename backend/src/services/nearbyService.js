@@ -2,6 +2,7 @@ const { GatewayError } = require('../gateway/errors');
 const { createNearbyCache } = require('../gateway/cache');
 const { normalizeResult, deduplicate, rank } = require('../gateway/nearbyCore');
 const { createGooglePlacesProvider } = require('../gateway/providers/googlePlaces');
+const { createGeoapifyProvider } = require('../gateway/providers/geoapify');
 const { createOverpassProvider } = require('../gateway/providers/overpass');
 const { createVerifiedServicesProvider } = require('../gateway/providers/verifiedServices');
 const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
@@ -10,6 +11,7 @@ const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('..
 function createNearbyService(env, options = {}) {
   const providers = orderProviders(options.providers || [
     createVerifiedServicesProvider(env, options.verifiedOptions || options),
+    createGeoapifyProvider(env, options.geoapifyOptions || options),
     createGooglePlacesProvider(env, options.googleOptions || options),
     createOverpassProvider(env, options.overpassOptions || options),
   ]);
@@ -57,6 +59,10 @@ function createNearbyService(env, options = {}) {
       for (const provider of providers) {
         if (!provider.configured) {
           diagnostics.emit({ provider: provider.name, stage: 'provider_failure', errorCode: 'PROVIDER_NOT_CONFIGURED' });
+          continue;
+        }
+        if (typeof provider.supportsCategory === 'function' && !provider.supportsCategory(params.category)) {
+          diagnostics.emit({ provider: provider.name, stage: 'provider_failure', errorCode: 'PROVIDER_CATEGORY_UNSUPPORTED' });
           continue;
         }
         const state = callState(provider);
