@@ -217,7 +217,7 @@ test('malformed and partial provider response is filtered', async () => {
   const providers = [{ name: 'osm', configured: true, searchNearby: async () => [raw(), raw({ providerId: 'bad', name: null })] }];
   assert.equal((await createNearbyService(env, { providers }).searchNearby(params)).items.length, 1);
 });
-test('cache key rounds exact coordinates', () => {
+test('cache key reuses a compatible nearby geographic cell', () => {
   const cache = createNearbyCache({ ttlMs: 1000, staleMs: 5000 });
   assert.equal(cache.key(params), cache.key({ ...params, latitude: params.latitude + 0.00001 }));
 });

@@ -39,6 +39,7 @@ function readEnv(source = process.env) {
   const providerTimeoutMs = Number.parseInt(mergedSource.PROVIDER_TIMEOUT_MS || '8000', 10);
   const nearbyCacheTtlMs = Number.parseInt(mergedSource.NEARBY_CACHE_TTL_MS || '300000', 10);
   const nearbyCacheStaleMs = Number.parseInt(mergedSource.NEARBY_CACHE_STALE_MS || '1800000', 10);
+  const nearbyCacheMaxEntries = Number.parseInt(mergedSource.NEARBY_CACHE_MAX_ENTRIES || '250', 10);
   const verifiedCacheTtlMs = Number.parseInt(mergedSource.VERIFIED_SERVICES_CACHE_TTL_MS || '21600000', 10);
   const allowedOrigins = (mergedSource.ALLOWED_ORIGINS || mergedSource.CORS_ORIGINS || '')
     .split(',').map((origin) => origin.trim()).filter(Boolean);
@@ -63,6 +64,8 @@ function readEnv(source = process.env) {
       nearbyCache: {
         ttlMs: Number.isFinite(nearbyCacheTtlMs) && nearbyCacheTtlMs >= 0 ? nearbyCacheTtlMs : 300000,
         staleMs: Number.isFinite(nearbyCacheStaleMs) && nearbyCacheStaleMs >= 0 ? nearbyCacheStaleMs : 1800000,
+        maxEntries: Number.isFinite(nearbyCacheMaxEntries) && nearbyCacheMaxEntries > 0
+          ? Math.min(nearbyCacheMaxEntries, 2000) : 250,
       },
       verifiedCacheTtlMs: Number.isFinite(verifiedCacheTtlMs) && verifiedCacheTtlMs >= 0
         ? verifiedCacheTtlMs : 21600000,

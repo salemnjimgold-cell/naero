@@ -1,5 +1,5 @@
 const { GatewayError } = require('../gateway/errors');
-const { createNearbyCache } = require('../gateway/cache');
+const { createNearbyCache, cacheDimensions } = require('../gateway/cache');
 const { normalizeResult, deduplicate, rank } = require('../gateway/nearbyCore');
 const { createGooglePlacesProvider } = require('../gateway/providers/googlePlaces');
 const { createGeoapifyProvider } = require('../gateway/providers/geoapify');
@@ -8,11 +8,46 @@ const { createVerifiedServicesProvider } = require('../gateway/providers/verifie
 const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
 const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('../gateway/resolverPolicy');
 
-function usableResults(raw, params) {
+const CACHE_RESULT_CAPACITY = 50;
+
+function usableResults(raw, params, capacity = params.limit) {
   const normalized = raw
     .map((item) => normalizeResult(item, params))
     .filter((item) => item && !item.permanentlyClosed);
-  return rank(deduplicate(normalized)).slice(0, params.limit);
+  return rank(deduplicate(normalized)).slice(0, capacity);
+}
+
+function cachePlan(params) {
+  const dimensions = cacheDimensions(params);
+  if (!dimensions.radiusBucket) return { cacheable: false, providerParams: { ...params, limit: CACHE_RESULT_CAPACITY } };
+  return {
+    cacheable: true,
+    providerParams: {
+      ...params,
+      latitude: dimensions.cell.centerLatitude,
+      longitude: dimensions.cell.centerLongitude,
+      radius: dimensions.radiusBucket,
+      limit: CACHE_RESULT_CAPACITY,
+    },
+  };
+}
+
+function cachedResponse(entry, params, { stale = false, attempted = [], succeeded = [] } = {}) {
+  const raw = entry.value.raw || entry.value.items || [];
+  const allUsable = usableResults(raw, params, CACHE_RESULT_CAPACITY);
+  const items = allUsable.slice(0, params.limit);
+  if (!stale && !entry.value.coverageComplete && items.length < params.limit) return null;
+  return {
+    items,
+    providers: entry.value.providers || [],
+    attributions: [...new Set(items.map((item) => item.sourceAttribution).filter(Boolean))],
+    cached: true,
+    stale,
+    partial: stale ? true : Boolean(entry.value.partial),
+    coverageStatus: stale ? 'stale' : coverageStatus({ items, params, failures: entry.value.partial ? [{}] : [] }),
+    sourcesAttempted: attempted,
+    sourcesSucceeded: succeeded,
+  };
 }
 
 function createNearbyService(env, options = {}) {
@@ -55,12 +90,10 @@ function createNearbyService(env, options = {}) {
     cache,
     async searchNearby(params, context = {}) {
       const diagnostics = createProviderDiagnostics(context.requestId, options.providerDiagnosticsLogger);
-      const fresh = cache.get(params);
-      if (fresh) return {
-        ...fresh.value, cached: true, stale: false,
-        coverageStatus: fresh.value.coverageStatus || 'sufficient',
-        sourcesAttempted: [], sourcesSucceeded: [],
-      };
+      const plan = cachePlan(params);
+      const fresh = plan.cacheable ? cache.get(params) : null;
+      const freshResponse = fresh && cachedResponse(fresh, params);
+      if (freshResponse) return freshResponse;
 
       const configured = [];
       for (const provider of providers) {
@@ -87,49 +120,64 @@ function createNearbyService(env, options = {}) {
       const used = [];
       const attempted = [];
       let items = [];
+      let completedProviders = 0;
       for (const provider of configured) {
         attempted.push(provider.name);
         const startedAt = now();
         diagnostics.emit({ provider: provider.name, stage: 'provider_start' });
         try {
-          const results = await provider.searchNearby(params, { diagnostics });
+          const results = await provider.searchNearby(plan.providerParams, { diagnostics });
           const elapsedMs = Math.max(0, now() - startedAt);
           diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: Array.isArray(results) ? results.length : 0 });
           record(provider, true, diagnostics);
           used.push(provider.name);
-          raw.push(...results.map((item) => ({ ...item, sourceRole: sourceRole(provider) })));
-          items = usableResults(raw, params);
-          if (isSufficient(items, params)) break;
+          const fetchedAt = new Date(startedAt).toISOString();
+          raw.push(...results.map((item) => ({
+            ...item,
+            fetchedAt: item.fetchedAt || fetchedAt,
+            sourceRole: sourceRole(provider),
+          })));
+          items = usableResults(raw, params, CACHE_RESULT_CAPACITY);
+          completedProviders += 1;
+          if (isSufficient(items.slice(0, params.limit), params)) break;
         } catch (error) {
           const elapsedMs = Math.max(0, now() - startedAt);
           diagnostics.emit({ provider: provider.name, stage: 'provider_failure', elapsedMs, errorCode: error?.code, errorClass: safeErrorClass(error) });
           record(provider, false, diagnostics);
           failures.push(error);
+          completedProviders += 1;
         }
       }
 
       if (!items.length && raw.length) {
-        items = usableResults(raw, params);
+        items = usableResults(raw, params, CACHE_RESULT_CAPACITY);
       }
       if (items.length || (used.length && failures.length === 0)) {
+        const responseItems = items.slice(0, params.limit);
         const value = {
-          items,
+          raw,
+          coverageComplete: completedProviders === configured.length || items.length >= CACHE_RESULT_CAPACITY,
+          storedCapacity: CACHE_RESULT_CAPACITY,
           providers: used,
-          attributions: [...new Set(items.map((item) => item.sourceAttribution).filter(Boolean))],
           partial: failures.length > 0,
-          coverageStatus: coverageStatus({ items, params, failures }),
+        };
+        if (plan.cacheable) cache.set(params, value);
+        return {
+          items: responseItems,
+          providers: used,
+          attributions: [...new Set(responseItems.map((item) => item.sourceAttribution).filter(Boolean))],
+          partial: failures.length > 0,
+          coverageStatus: coverageStatus({ items: responseItems, params, failures }),
           sourcesAttempted: attempted,
           sourcesSucceeded: used,
+          cached: false,
+          stale: false,
         };
-        cache.set(params, value);
-        return { ...value, cached: false, stale: false };
       }
 
-      const stale = cache.get(params, { allowStale: true });
-      if (stale) return {
-        ...stale.value, cached: true, stale: true, partial: true, coverageStatus: 'stale',
-        sourcesAttempted: attempted, sourcesSucceeded: used,
-      };
+      const stale = plan.cacheable ? cache.get(params, { allowStale: true }) : null;
+      const staleResponse = stale && cachedResponse(stale, params, { stale: true, attempted, succeeded: used });
+      if (staleResponse?.items.length) return staleResponse;
       const timedOut = failures.length && failures.every((error) => error.code === 'PROVIDER_TIMEOUT');
       throw new GatewayError(timedOut ? 'PROVIDER_TIMEOUT' : 'PROVIDER_UNAVAILABLE',
         timedOut ? 'All nearby providers timed out.' : 'All nearby providers are unavailable.');
@@ -137,4 +185,4 @@ function createNearbyService(env, options = {}) {
   };
 }
 
-module.exports = { createNearbyService, usableResults };
+module.exports = { CACHE_RESULT_CAPACITY, cachePlan, createNearbyService, usableResults };
