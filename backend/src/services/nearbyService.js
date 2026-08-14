@@ -5,6 +5,7 @@ const { createGooglePlacesProvider } = require('../gateway/providers/googlePlace
 const { createGeoapifyProvider } = require('../gateway/providers/geoapify');
 const { createOverpassProvider } = require('../gateway/providers/overpass');
 const { createVerifiedServicesProvider } = require('../gateway/providers/verifiedServices');
+const { createDiscoveredPlacesProvider } = require('../gateway/providers/discoveredPlaces');
 const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
 const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('../gateway/resolverPolicy');
 
@@ -53,6 +54,7 @@ function cachedResponse(entry, params, { stale = false, attempted = [], succeede
 function createNearbyService(env, options = {}) {
   const providers = orderProviders(options.providers || [
     createVerifiedServicesProvider(env, options.verifiedOptions || options),
+    createDiscoveredPlacesProvider(env, options.discoveredOptions || options),
     createGeoapifyProvider(env, options.geoapifyOptions || options),
     createGooglePlacesProvider(env, options.googleOptions || options),
     createOverpassProvider(env, options.overpassOptions || options),
@@ -137,6 +139,16 @@ function createNearbyService(env, options = {}) {
             fetchedAt: item.fetchedAt || fetchedAt,
             sourceRole: sourceRole(provider),
           })));
+          if (sourceRole(provider) === 'LIVE') {
+            const discovered = providers.find((candidate) => sourceRole(candidate) === 'DISCOVERED');
+            if (discovered?.persistenceEnabled) {
+              try { await discovered.persist(results, plan.providerParams); }
+              catch (error) {
+                diagnostics.emit({ provider: 'discovered', stage: 'provider_failure',
+                  errorCode: 'PERSISTENCE_FAILED', errorClass: safeErrorClass(error) });
+              }
+            }
+          }
           items = usableResults(raw, params, CACHE_RESULT_CAPACITY);
           completedProviders += 1;
           if (isSufficient(items.slice(0, params.limit), params)) break;
@@ -178,6 +190,18 @@ function createNearbyService(env, options = {}) {
       const stale = plan.cacheable ? cache.get(params, { allowStale: true }) : null;
       const staleResponse = stale && cachedResponse(stale, params, { stale: true, attempted, succeeded: used });
       if (staleResponse?.items.length) return staleResponse;
+      const discovered = providers.find((provider) => sourceRole(provider) === 'DISCOVERED'
+        && provider.configured && typeof provider.searchStale === 'function');
+      if (discovered) {
+        try {
+          const staleItems = usableResults(await discovered.searchStale(plan.providerParams), params,
+            CACHE_RESULT_CAPACITY).slice(0, params.limit);
+          if (staleItems.length) return { items: staleItems, providers: ['discovered'],
+            attributions: [...new Set(staleItems.map((item) => item.sourceAttribution).filter(Boolean))],
+            cached: false, stale: true, partial: true, coverageStatus: 'stale',
+            sourcesAttempted: attempted, sourcesSucceeded: used };
+        } catch { /* Preserve the primary safe provider failure. */ }
+      }
       const timedOut = failures.length && failures.every((error) => error.code === 'PROVIDER_TIMEOUT');
       throw new GatewayError(timedOut ? 'PROVIDER_TIMEOUT' : 'PROVIDER_UNAVAILABLE',
         timedOut ? 'All nearby providers timed out.' : 'All nearby providers are unavailable.');
