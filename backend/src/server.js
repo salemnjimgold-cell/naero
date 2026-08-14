@@ -1,6 +1,7 @@
 const http = require('http');
 const crypto = require('crypto');
 const { readEnv, getPublicConfig, validateEnv } = require('./config/env');
+const { emitLde3RuntimeFlagDiagnostics } = require('./config/runtimeFlagDiagnostic');
 const { getCorsHeaders } = require('./http/cors');
 const { getSecurityHeaders } = require('./http/security');
 const { sendJson, readJson } = require('./http/respond');
@@ -160,6 +161,12 @@ function createRequestHandler(options = {}) {
 
 function startServer(options = {}) {
   const env = options.env || readEnv();
+
+  emitLde3RuntimeFlagDiagnostics({
+    rawPersistenceValue: process.env.DISCOVERED_PLACE_PERSISTENCE_ENABLED,
+    env,
+    log: logger.info,
+  });
 
   const validation = validateEnv(env);
   if (!validation.valid) {
