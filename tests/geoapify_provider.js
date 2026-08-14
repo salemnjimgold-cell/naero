@@ -147,13 +147,13 @@ test('Geoapify total failure preserves safe gateway failure semantics', async ()
   const providers = [{ name: 'geoapify', sourceRole: 'LIVE', configured: true, supportsCategory: () => true, searchNearby: async () => { throw Object.assign(new Error(), { code: 'PROVIDER_UNAVAILABLE' }); } }];
   await assert.rejects(() => createNearbyService(env, { providers }).searchNearby(params), (error) => error.code === 'PROVIDER_UNAVAILABLE');
 });
-test('default provider priority is verified, Geoapify, Google, OSM', () => {
+test('default provider priority is verified, discovered, Geoapify, Google, OSM', () => {
   const service = createNearbyService({
     ...env,
     providers: { geoapifyApiKey: 'configured', googlePlacesApiKey: 'configured', overpassApiUrl: 'https://overpass.example' },
     supabase: { url: 'https://supabase.example', anonKey: 'configured', serviceRoleKey: '' },
   }, { fetchImpl: async () => response({ type: 'FeatureCollection', features: [] }) });
-  assert.deepEqual(service.providers.map((provider) => provider.name), ['naero', 'geoapify', 'google', 'osm']);
+  assert.deepEqual(service.providers.map((provider) => provider.name), ['naero', 'discovered', 'geoapify', 'google', 'osm']);
 });
 test('unconfigured Geoapify does not destabilize configured fallback', async () => {
   const providers = [

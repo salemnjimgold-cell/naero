@@ -16,6 +16,7 @@
     "test:nearby": "node tests/nearby_provider.js",
     "test:geoapify": "node tests/geoapify_provider.js",
     "test:cache": "node tests/smart_geographic_cache.js",
+    "test:lde3": "node tests/persistent_discovered_store.js",
     "test:observability": "node tests/provider_observability.js",
     "test:network-errors": "node tests/network_error_classification.js",
     "test:nearby:cities": "node tests/nearby_city_qa.js",
