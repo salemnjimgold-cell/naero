@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
+import PlaceAttributionLinks from '../components/PlaceAttributionLinks';
 import { mockCategories } from '../data/providers/mockCategories';
 const { categoriesMatch } = require('../services/nearbyClientCore');
 
@@ -288,7 +289,7 @@ export default function DiscoverScreen({ navigation }) {
         })}
       </ScrollView>
       {stale && <Text style={styles.providerNotice}>Showing cached nearby results while providers recover.</Text>}
-      {attributions.length > 0 && <Text style={styles.attribution}>{attributions.join(' · ')}</Text>}
+      {attributions.length > 0 && <View style={styles.attribution}><PlaceAttributionLinks attributions={attributions} color={COLORS.textTertiary} /></View>}
     </View>
   );
 

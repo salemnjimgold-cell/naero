@@ -14,7 +14,11 @@ The initial safe TTL is seven days. Fresh records participate before live discov
 
 Only normalized Geoapify results with a stable identity, supported category, name, valid coordinates, matching country, attribution, and no permanent-closure signal are eligible. Database uniqueness plus locked upsert makes repeat/concurrent identity handling safe. Cross-provider fuzzy merging is deliberately absent.
 
-The existing LDE-1 decision says persistent storage requires rechecking the actual subscribed plan and applicable current terms. That evidence is not recorded yet. Consequently `DISCOVERED_PLACE_STORE_ENABLED` and `DISCOVERED_PLACE_PERSISTENCE_ENABLED` both default to false, and Geoapify persistence must remain disabled until product/legal approval records the applicable terms. Enabling reads requires Migration 006 first; enabling writes is a separate gate.
+The Geoapify persistent-storage licensing gate was completed on 2026-08-14 against the signed-in Naero Production project. The subscribed plan was **Geoapify Free**, with 3,000 credits/day and up to 5 requests/second. Geoapify's current Places documentation permits caching, persistent storage, reuse, and redistribution subject to attribution and underlying open-data licensing. The Free plan requires linked Geoapify attribution, and OpenStreetMap-derived data requires OSM/ODbL attribution.
+
+Persisted Geoapify sources therefore carry fixed structured metadata for `ODbL-1.0`, the ODbL URI, OSM copyright URI, Geoapify URI, current Geoapify terms URI, provider identity, attribution, and retrieval/freshness timestamps. `DISCOVERED_PLACE_STORE_ENABLED` and `DISCOVERED_PLACE_PERSISTENCE_ENABLED` still default to false. Enabling reads requires Migration 006 first; enabling writes remains a separate acceptance gate.
+
+The subscribed plan and applicable terms must be rechecked before material geographic expansion, high-volume accumulation, bulk/reusable data export, or a significant commercial scale change. Any future bulk export or reusable database redistribution must include OSM attribution, ODbL identity and URI, and source/provenance metadata. Substantial systematic extraction requires renewed licensing/legal review. LDE-3 does not implement bulk export.
 
 ## Rollback and future refresh
 
