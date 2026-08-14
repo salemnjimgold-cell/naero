@@ -26,7 +26,22 @@ const CATEGORY_REGISTRY = Object.freeze({
 });
 
 function getCategory(key) {
-  return CATEGORY_REGISTRY[key] || null;
+  return CATEGORY_REGISTRY[canonicalCategory(key)] || null;
 }
 
-module.exports = { CATEGORY_REGISTRY, getCategory };
+const CATEGORY_ALIASES = Object.freeze({
+  hospitals: 'hospital',
+  pharmacies: 'pharmacy',
+  supermarkets: 'supermarket',
+  clinics: 'clinic',
+  banks: 'bank',
+  atms: 'atm',
+  schools: 'school',
+});
+
+function canonicalCategory(key) {
+  const normalized = typeof key === 'string' ? key.trim().toLowerCase() : '';
+  return CATEGORY_ALIASES[normalized] || normalized;
+}
+
+module.exports = { CATEGORY_ALIASES, CATEGORY_REGISTRY, canonicalCategory, getCategory };
