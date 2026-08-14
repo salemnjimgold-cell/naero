@@ -28,6 +28,8 @@ function safeLineage(raw) {
     fetchedAt: clean(raw.fetchedAt),
     verifiedAt: clean(raw.lastVerifiedAt),
     attribution: clean(raw.sourceAttribution),
+    licenceId: clean(raw.sourceLicence?.licenceId),
+    licenceUrl: clean(raw.sourceLicence?.licenceUrl),
   }];
 }
 function setLineage(item, lineage) {
@@ -66,6 +68,9 @@ function normalizeResult(raw, context) {
     fetchedAt: raw.fetchedAt || new Date().toISOString(),
     lastVerifiedAt: raw.lastVerifiedAt || null,
     sourceAttribution: clean(raw.sourceAttribution),
+    sourceLicence: raw.sourceLicence && typeof raw.sourceLicence === 'object' ? { ...raw.sourceLicence } : null,
+    sourceLicences: Array.isArray(raw.sourceLicences) ? raw.sourceLicences.map((value) => ({ ...value }))
+      : raw.sourceLicence && typeof raw.sourceLicence === 'object' ? [{ ...raw.sourceLicence }] : [],
     navigationUrl: clean(raw.navigationUrl),
     permanentlyClosed: raw.permanentlyClosed === true,
   };
@@ -99,6 +104,9 @@ function mergePreferred(a, b) {
   const merged = { ...other, ...preferred };
   for (const key of Object.keys(merged)) if (merged[key] === null && other[key] !== null) merged[key] = other[key];
   merged.sourceAttribution = [...new Set([a.sourceAttribution, b.sourceAttribution].filter(Boolean))].join('; ');
+  merged.sourceLicence = preferred.sourceLicence || other.sourceLicence || null;
+  merged.sourceLicences = [...(a.sourceLicences || []), ...(b.sourceLicences || [])].filter((entry, index, all) =>
+    all.findIndex((candidate) => candidate.provider === entry.provider && candidate.licenceId === entry.licenceId) === index);
   const lineage = [...(a._lineage || []), ...(b._lineage || [])].filter((entry, index, all) =>
     all.findIndex((candidate) => candidate.provider === entry.provider && candidate.providerId === entry.providerId) === index);
   return setLineage(merged, lineage);

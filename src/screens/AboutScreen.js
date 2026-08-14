@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER, FONTS, SPACING, RADIUS } from '../theme';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
+const { PLACE_SOURCE_LINKS } = require('../domain/placeAttribution');
 
 export default function AboutScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -70,6 +71,21 @@ export default function AboutScreen({ navigation }) {
               )
             )}
           </View>
+        </View>
+
+        <View style={styles.card} accessibilityLabel="Data sources and licences">
+          <Text style={styles.cardTitle}>Data Sources &amp; Licences</Text>
+          <Text style={styles.body}>
+            Geoapify provides Places API discovery. Place information is principally derived from OpenStreetMap and is available under ODbL 1.0. Naero may cache and store normalized public place information with its source and licence metadata.
+          </Text>
+          <Text style={[styles.body, styles.notice]}>
+            Third-party discovered places are not automatically Naero Verified. Naero Verified is a separate human-reviewed trust layer.
+          </Text>
+          {[PLACE_SOURCE_LINKS.geoapify, PLACE_SOURCE_LINKS.osm, PLACE_SOURCE_LINKS.odbl].map((link) => (
+            <TouchableOpacity key={link.url} accessibilityRole="link" accessibilityLabel={`Open ${link.label}`} style={styles.legalLink} onPress={() => Linking.openURL(link.url)}>
+              <Text style={styles.legalLinkText}>{link.label}</Text><Ionicons name="open-outline" size={18} color={COLORS.primary} />
+            </TouchableOpacity>
+          ))}
         </View>
 
         <View style={styles.card}>
@@ -170,6 +186,9 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 24,
   },
+  notice: { marginTop: SPACING.md },
+  legalLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.sm },
+  legalLinkText: { ...FONTS.body, color: COLORS.primary, textDecorationLine: 'underline', flex: 1 },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { GatewayError } = require('../errors');
 const { getCategory } = require('../categories');
 const { cacheDimensions } = require('../cache');
+const { GEOAPIFY_LICENCE } = require('./geoapifyLicence');
 
 const ALLOWED_PERSISTENCE_PROVIDERS = new Set(['geoapify']);
 const DISCOVERED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -23,8 +24,10 @@ function persistenceRecord(item, params, now = Date.now()) {
     latitude: item.latitude, longitude: item.longitude, address: item.address || null, city: item.city || null,
     district: item.district || null, region: item.region || null, postalCode: item.postalCode || null,
     countryCode: item.countryCode.toUpperCase(), phone: item.phone || null, website: item.website || null,
-    openingHours: item.openingHours || null, sourceAttribution: item.sourceAttribution,
-    licenceId: 'geoapify-terms', fetchedAt, expiresAt: new Date(now + DISCOVERED_TTL_MS).toISOString(),
+    openingHours: item.openingHours || null, sourceAttribution: GEOAPIFY_LICENCE.attribution,
+    licenceId: GEOAPIFY_LICENCE.licenceId, licenceUrl: GEOAPIFY_LICENCE.licenceUrl,
+    osmCopyrightUrl: GEOAPIFY_LICENCE.osmCopyrightUrl, providerUrl: GEOAPIFY_LICENCE.providerUrl,
+    termsUrl: GEOAPIFY_LICENCE.termsUrl, fetchedAt, expiresAt: new Date(now + DISCOVERED_TTL_MS).toISOString(),
     contentFingerprint: crypto.createHash('sha256').update(fingerprintInput).digest('hex'),
   };
 }
@@ -36,6 +39,9 @@ function normalizeRow(row) {
     postalCode: row.postal_code || null, countryCode: row.country_code || null, phone: row.phone || null,
     website: row.website || null, openingHours: row.opening_hours || null, fetchedAt: row.fetched_at || null,
     verified: false, permanentlyClosed: false, sourceAttribution: row.source_attribution || null,
+    sourceLicence: { provider: row.provider, licenceId: row.licence_id, licenceUrl: row.licence_url,
+      osmCopyrightUrl: row.osm_copyright_url, providerUrl: row.provider_url, termsUrl: row.terms_url,
+      attribution: row.source_attribution },
     sourceRole: 'DISCOVERED',
   };
 }

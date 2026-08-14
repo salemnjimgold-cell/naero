@@ -2,9 +2,10 @@ const { GatewayError } = require('../errors');
 const { getCategory } = require('../categories');
 const { safeErrorClass, classifyNetworkError, classifyAddressFamilyAttempts } = require('../providerDiagnostics');
 const { getGeoapifyCategory, supportsGeoapifyCategory } = require('./geoapifyCategories');
+const { GEOAPIFY_LICENCE } = require('./geoapifyLicence');
 
 const GEOAPIFY_PLACES_URL = 'https://api.geoapify.com/v2/places';
-const GEOAPIFY_ATTRIBUTION = '© OpenStreetMap contributors; Powered by Geoapify';
+const GEOAPIFY_ATTRIBUTION = GEOAPIFY_LICENCE.attribution;
 
 function clean(value) { return typeof value === 'string' && value.trim() ? value.trim() : null; }
 function openingHours(properties) {
@@ -38,6 +39,7 @@ function normalizeGeoapifyPlace(feature, params) {
     confidence: getCategory(params.category)?.confidence || 'low',
     fetchedAt: new Date().toISOString(),
     sourceAttribution: GEOAPIFY_ATTRIBUTION,
+    sourceLicence: GEOAPIFY_LICENCE,
     navigationUrl: null,
   };
 }
