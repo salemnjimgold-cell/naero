@@ -8,6 +8,13 @@ const { createVerifiedServicesProvider } = require('../gateway/providers/verifie
 const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
 const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('../gateway/resolverPolicy');
 
+function usableResults(raw, params) {
+  const normalized = raw
+    .map((item) => normalizeResult(item, params))
+    .filter((item) => item && !item.permanentlyClosed);
+  return rank(deduplicate(normalized)).slice(0, params.limit);
+}
+
 function createNearbyService(env, options = {}) {
   const providers = orderProviders(options.providers || [
     createVerifiedServicesProvider(env, options.verifiedOptions || options),
@@ -91,10 +98,7 @@ function createNearbyService(env, options = {}) {
           record(provider, true, diagnostics);
           used.push(provider.name);
           raw.push(...results.map((item) => ({ ...item, sourceRole: sourceRole(provider) })));
-          const normalized = raw
-            .map((item) => normalizeResult(item, params))
-            .filter((item) => item && !item.permanentlyClosed);
-          items = rank(deduplicate(normalized)).slice(0, params.limit);
+          items = usableResults(raw, params);
           if (isSufficient(items, params)) break;
         } catch (error) {
           const elapsedMs = Math.max(0, now() - startedAt);
@@ -105,8 +109,7 @@ function createNearbyService(env, options = {}) {
       }
 
       if (!items.length && raw.length) {
-        const normalized = raw.map((item) => normalizeResult(item, params)).filter((item) => item && !item.permanentlyClosed);
-        items = rank(deduplicate(normalized)).slice(0, params.limit);
+        items = usableResults(raw, params);
       }
       if (items.length || (used.length && failures.length === 0)) {
         const value = {
@@ -134,4 +137,4 @@ function createNearbyService(env, options = {}) {
   };
 }
 
-module.exports = { createNearbyService };
+module.exports = { createNearbyService, usableResults };

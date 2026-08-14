@@ -22,6 +22,11 @@ function gatewayCategory(category) {
   return CATEGORY_ALIASES[category] || category;
 }
 
+function categoriesMatch(left, right) {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  return gatewayCategory(left) === gatewayCategory(right);
+}
+
 function createNearbyQuery({ latitude, longitude, radiusKm, limit, category, language }) {
   return new URLSearchParams({
     latitude: String(latitude),
@@ -33,4 +38,4 @@ function createNearbyQuery({ latitude, longitude, radiusKm, limit, category, lan
   }).toString();
 }
 
-module.exports = { CATEGORY_ALIASES, gatewayCategory, createNearbyQuery };
+module.exports = { CATEGORY_ALIASES, gatewayCategory, categoriesMatch, createNearbyQuery };
