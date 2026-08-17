@@ -1,10 +1,11 @@
 const { logger } = require('../observability/logger');
 const { isIP } = require('node:net');
 
-const PROVIDERS = new Set(['naero', 'geoapify', 'google', 'osm']);
+const PROVIDERS = new Set(['naero', 'discovered', 'geoapify', 'google', 'osm']);
 const STAGES = new Set([
   'provider_start', 'request', 'http_response', 'parse', 'normalization',
   'provider_success', 'provider_failure', 'circuit_open', 'circuit_probe', 'circuit_closed',
+  'coverage_read', 'coverage_decision', 'refresh_claim', 'refresh_complete', 'refresh_failure',
 ]);
 const SAFE_ERROR_CLASSES = new Set([
   'AbortError', 'GatewayError', 'SyntaxError', 'TypeError',
@@ -143,6 +144,12 @@ function createProviderDiagnostics(requestId, write = (message, meta) => logger.
       if (errorCode !== undefined) meta.errorCode = errorCode;
       if (SAFE_ERROR_CLASSES.has(event.errorClass)) meta.errorClass = event.errorClass;
       if (NETWORK_CLASSES.has(event.networkClass)) meta.networkClass = event.networkClass;
+      const coverageStates = new Set(['UNSEEN','SUFFICIENT','PARTIAL','EXHAUSTED','STALE','REFRESHING','REFRESH_FAILED']);
+      const claimOutcomes = new Set(['acquired','contended','not_eligible']);
+      if (coverageStates.has(event.coverageState)) meta.coverageState = event.coverageState;
+      if (claimOutcomes.has(event.claimOutcome)) meta.claimOutcome = event.claimOutcome;
+      if (typeof event.liveSuppressed === 'boolean') meta.liveSuppressed = event.liveSuppressed;
+      if (typeof event.coverageComplete === 'boolean') meta.coverageComplete = event.coverageComplete;
       if (typeof event.multiAddress === 'boolean') meta.multiAddress = event.multiAddress;
       const attemptCount = safeInteger(event.attemptCount, { min: 1, max: MAX_ADDRESS_ATTEMPTS });
       if (attemptCount !== undefined) meta.attemptCount = attemptCount;

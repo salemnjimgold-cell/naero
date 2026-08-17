@@ -3,6 +3,7 @@ const { GatewayError } = require('../errors');
 const { getCategory } = require('../categories');
 const { cacheDimensions } = require('../cache');
 const { GEOAPIFY_LICENCE } = require('./geoapifyLicence');
+const { COVERAGE_POLICY_VERSION, COVERAGE_SCHEMA_VERSION } = require('../coverageLifecycle');
 
 const ALLOWED_PERSISTENCE_PROVIDERS = new Set(['geoapify']);
 const DISCOVERED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,6 +52,40 @@ function createDiscoveredPlacesProvider(env, options = {}) {
     && Boolean(env.supabase.url && env.supabase.serviceRoleKey);
   const persistenceEnabled = configured && env.gateway?.discoveredPersistenceEnabled === true
     && Boolean(env.supabase.serviceRoleKey);
+  const coverageEnabled = configured && env.gateway?.coverageIntelligenceEnabled === true;
+  const demandRefreshEnabled = coverageEnabled && env.gateway?.demandRefreshEnabled === true;
+  function coverageDimensions(params) {
+    const dimensions = cacheDimensions(params);
+    if (!dimensions.radiusBucket) return null;
+    return { cellId: dimensions.cell.id, category: dimensions.category,
+      radiusBucket: dimensions.radiusBucket, countryCode: dimensions.countryCode,
+      language: dimensions.language, sourcePolicyVersion: COVERAGE_POLICY_VERSION,
+      schemaVersion: COVERAGE_SCHEMA_VERSION };
+  }
+  async function manageCoverage(operation, params, outcome = {}) {
+    if (!coverageEnabled) return operation === 'read' ? { state: 'UNSEEN' } : { enabled: false };
+    const dimensions = coverageDimensions(params);
+    if (!dimensions) return operation === 'read' ? { state: 'UNSEEN' } : { enabled: false };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), env.gateway.providerTimeoutMs);
+    try {
+      const response = await fetchImpl(`${env.supabase.url}/rest/v1/rpc/manage_discovery_coverage`, {
+        method: 'POST', headers: { apikey: env.supabase.serviceRoleKey,
+          authorization: `Bearer ${env.supabase.serviceRoleKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ p_operation: operation, p_dimensions: dimensions, p_outcome: outcome }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new GatewayError('PERSISTENCE_FAILED', 'Coverage lifecycle operation failed.');
+      const payload = await response.json();
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new GatewayError('PERSISTENCE_FAILED', 'Coverage lifecycle returned an invalid response.');
+      }
+      return payload;
+    } catch (error) {
+      if (error instanceof GatewayError) throw error;
+      throw new GatewayError('PERSISTENCE_FAILED', 'Coverage lifecycle operation failed.');
+    } finally { clearTimeout(timer); }
+  }
   async function rpc(params, includeStale) {
     if (!configured) throw new GatewayError('PROVIDER_NOT_CONFIGURED', 'Persistent discovery is not configured.');
     const controller = new AbortController();
@@ -79,6 +114,11 @@ function createDiscoveredPlacesProvider(env, options = {}) {
   }
   return {
     name: 'discovered', sourceRole: 'DISCOVERED', configured, persistenceEnabled,
+    coverageEnabled, demandRefreshEnabled,
+    readCoverage: (params) => manageCoverage('read', params),
+    claimRefresh: (params) => manageCoverage('claim', params),
+    completeRefresh: (params, outcome) => manageCoverage('complete', params, outcome),
+    failRefresh: (params, outcome) => manageCoverage('fail', params, outcome),
     searchNearby: (params) => rpc(params, false), searchStale: (params) => rpc(params, true),
     async persist(items, params) {
       if (!persistenceEnabled) return { enabled: false, persisted: 0 };
@@ -93,7 +133,7 @@ function createDiscoveredPlacesProvider(env, options = {}) {
         if (!response.ok) throw new GatewayError('PERSISTENCE_FAILED', 'Persistent discovery write failed.');
         persisted += 1;
       }
-      if (records.length) {
+      if (records.length && !coverageEnabled) {
         const dimensions = cacheDimensions(params);
         if (dimensions.radiusBucket) {
           const expiresAt = records.reduce((earliest, record) => (
