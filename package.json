@@ -18,6 +18,7 @@
     "test:cache": "node tests/smart_geographic_cache.js",
     "test:lde3": "node tests/persistent_discovered_store.js",
     "test:lde3:compliance": "node tests/lde3_geoapify_compliance.js",
+    "test:lde4": "node tests/lde4_coverage_lifecycle.js",
     "test:observability": "node tests/provider_observability.js",
     "test:network-errors": "node tests/network_error_classification.js",
     "test:nearby:cities": "node tests/nearby_city_qa.js",

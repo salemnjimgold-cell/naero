@@ -8,6 +8,7 @@ const { createVerifiedServicesProvider } = require('../gateway/providers/verifie
 const { createDiscoveredPlacesProvider } = require('../gateway/providers/discoveredPlaces');
 const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
 const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('../gateway/resolverPolicy');
+const { COVERAGE_STATES, coverageDecision, refreshOutcome } = require('../gateway/coverageLifecycle');
 
 const CACHE_RESULT_CAPACITY = 50;
 
@@ -97,7 +98,21 @@ function createNearbyService(env, options = {}) {
       const freshResponse = fresh && cachedResponse(fresh, params);
       if (freshResponse) return freshResponse;
 
+      const discoveredProvider = providers.find((provider) => sourceRole(provider) === 'DISCOVERED');
+      let lifecycleState = { state: COVERAGE_STATES.UNSEEN };
+      if (discoveredProvider?.coverageEnabled) {
+        try {
+          lifecycleState = await discoveredProvider.readCoverage(plan.providerParams);
+          diagnostics.emit({ provider: 'discovered', stage: 'coverage_read', coverageState: lifecycleState.state });
+        } catch (error) {
+          diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
+            errorCode: 'COVERAGE_READ_FAILED', errorClass: safeErrorClass(error) });
+          lifecycleState = { state: COVERAGE_STATES.UNSEEN };
+        }
+      }
+
       const configured = [];
+      let liveCoverageBlocked = false;
       for (const provider of providers) {
         if (!provider.configured) {
           diagnostics.emit({ provider: provider.name, stage: 'provider_failure', errorCode: 'PROVIDER_NOT_CONFIGURED' });
@@ -110,6 +125,7 @@ function createNearbyService(env, options = {}) {
         const state = callState(provider);
         if (!state.allowed) {
           diagnostics.emit({ provider: provider.name, stage: 'circuit_open', errorCode: 'CIRCUIT_OPEN' });
+          if (sourceRole(provider) === 'LIVE') liveCoverageBlocked = true;
           continue;
         }
         if (state.probe) diagnostics.emit({ provider: provider.name, stage: 'circuit_probe' });
@@ -121,10 +137,57 @@ function createNearbyService(env, options = {}) {
       const failures = [];
       const used = [];
       const attempted = [];
+      const liveAttempted = [];
+      const liveSucceeded = [];
+      let liveFailures = 0;
+      let refreshClaimed = false;
+      let refreshClaimToken = null;
+      let lifecycleDecisionMade = false;
+      let liveSuppressed = false;
+      let lifecycleResponseStatus = null;
       let items = [];
       let completedProviders = 0;
       for (const provider of configured) {
+        if (sourceRole(provider) === 'LIVE' && !lifecycleDecisionMade) {
+          lifecycleDecisionMade = true;
+          if (discoveredProvider?.coverageEnabled) {
+            const decision = coverageDecision(lifecycleState, {
+              demandRefreshEnabled: discoveredProvider.demandRefreshEnabled === true,
+              availableCount: items.length,
+            });
+            diagnostics.emit({ provider: 'discovered', stage: 'coverage_decision',
+              coverageState: decision.state, liveSuppressed: decision.action !== 'continue' && decision.action !== 'claim_refresh' });
+            if (!failures.length && ['suppress_live', 'await_existing', 'backoff'].includes(decision.action)) {
+              liveSuppressed = true;
+              lifecycleResponseStatus = decision.action === 'suppress_live' ? 'exhausted' : 'partial';
+              break;
+            }
+            if (decision.action === 'claim_refresh') {
+              try {
+                const claim = await discoveredProvider.claimRefresh(plan.providerParams);
+                refreshClaimed = claim.claimed === true;
+                refreshClaimToken = refreshClaimed && typeof claim.claimToken === 'string' ? claim.claimToken : null;
+                if (refreshClaimed && !refreshClaimToken) {
+                  throw new GatewayError('PERSISTENCE_FAILED', 'Coverage refresh claim was invalid.');
+                }
+                diagnostics.emit({ provider: 'discovered', stage: 'refresh_claim',
+                  coverageState: refreshClaimed ? COVERAGE_STATES.REFRESHING : lifecycleState.state,
+                  claimOutcome: refreshClaimed ? 'acquired' : 'contended' });
+                if (!refreshClaimed) {
+                  liveSuppressed = true;
+                  lifecycleResponseStatus = 'partial';
+                  break;
+                }
+              } catch (error) {
+                diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
+                  errorCode: 'REFRESH_CLAIM_FAILED', errorClass: safeErrorClass(error) });
+                // Coverage intelligence must fail toward the existing live path.
+              }
+            }
+          }
+        }
         attempted.push(provider.name);
+        if (sourceRole(provider) === 'LIVE') liveAttempted.push(provider.name);
         const startedAt = now();
         diagnostics.emit({ provider: provider.name, stage: 'provider_start' });
         try {
@@ -133,6 +196,7 @@ function createNearbyService(env, options = {}) {
           diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: Array.isArray(results) ? results.length : 0 });
           record(provider, true, diagnostics);
           used.push(provider.name);
+          if (sourceRole(provider) === 'LIVE') liveSucceeded.push(provider.name);
           const fetchedAt = new Date(startedAt).toISOString();
           raw.push(...results.map((item) => ({
             ...item,
@@ -157,7 +221,33 @@ function createNearbyService(env, options = {}) {
           diagnostics.emit({ provider: provider.name, stage: 'provider_failure', elapsedMs, errorCode: error?.code, errorClass: safeErrorClass(error) });
           record(provider, false, diagnostics);
           failures.push(error);
+          if (sourceRole(provider) === 'LIVE') liveFailures += 1;
           completedProviders += 1;
+        }
+      }
+
+      if (refreshClaimed) {
+        const applicableLiveCount = configured.filter((provider) => sourceRole(provider) === 'LIVE').length;
+        const outcome = refreshOutcome({ items, limit: params.limit, liveAttempted, liveSucceeded, liveFailures: failures.length,
+          chainComplete: !liveCoverageBlocked && failures.length === liveFailures
+            && liveAttempted.length === applicableLiveCount });
+        try {
+          if (liveFailures > 0 && liveSucceeded.length === 0) {
+            await discoveredProvider.failRefresh(plan.providerParams, {
+              claimToken: refreshClaimToken, failureCode: 'LIVE_PROVIDER_FAILURE', providersAttempted: liveAttempted,
+              providersSucceeded: liveSucceeded,
+            });
+            diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
+              coverageState: COVERAGE_STATES.REFRESH_FAILED, errorCode: 'LIVE_PROVIDER_FAILURE' });
+          } else {
+            await discoveredProvider.completeRefresh(plan.providerParams, { ...outcome, claimToken: refreshClaimToken });
+            diagnostics.emit({ provider: 'discovered', stage: 'coverage_complete',
+              coverageState: outcome.status, resultCount: outcome.resultCount,
+              coverageComplete: outcome.coverageComplete });
+          }
+        } catch (error) {
+          diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
+            errorCode: 'COVERAGE_WRITE_FAILED', errorClass: safeErrorClass(error) });
         }
       }
 
@@ -171,19 +261,20 @@ function createNearbyService(env, options = {}) {
           coverageComplete: completedProviders === configured.length || items.length >= CACHE_RESULT_CAPACITY,
           storedCapacity: CACHE_RESULT_CAPACITY,
           providers: used,
-          partial: failures.length > 0,
+          partial: failures.length > 0 || lifecycleResponseStatus === 'partial',
         };
         if (plan.cacheable) cache.set(params, value);
         return {
           items: responseItems,
           providers: used,
           attributions: [...new Set(responseItems.map((item) => item.sourceAttribution).filter(Boolean))],
-          partial: failures.length > 0,
-          coverageStatus: coverageStatus({ items: responseItems, params, failures }),
+          partial: failures.length > 0 || lifecycleResponseStatus === 'partial',
+          coverageStatus: lifecycleResponseStatus || coverageStatus({ items: responseItems, params, failures }),
           sourcesAttempted: attempted,
           sourcesSucceeded: used,
           cached: false,
           stale: false,
+          liveSuppressed,
         };
       }
 
