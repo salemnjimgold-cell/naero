@@ -105,7 +105,7 @@ function createNearbyService(env, options = {}) {
           lifecycleState = await discoveredProvider.readCoverage(plan.providerParams);
           diagnostics.emit({ provider: 'discovered', stage: 'coverage_read', coverageState: lifecycleState.state });
         } catch (error) {
-          diagnostics.emit({ provider: 'discovered', stage: 'refresh_failure',
+          diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
             errorCode: 'COVERAGE_READ_FAILED', errorClass: safeErrorClass(error) });
           lifecycleState = { state: COVERAGE_STATES.UNSEEN };
         }
@@ -179,7 +179,7 @@ function createNearbyService(env, options = {}) {
                   break;
                 }
               } catch (error) {
-                diagnostics.emit({ provider: 'discovered', stage: 'refresh_failure',
+                diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
                   errorCode: 'REFRESH_CLAIM_FAILED', errorClass: safeErrorClass(error) });
                 // Coverage intelligence must fail toward the existing live path.
               }
@@ -237,16 +237,16 @@ function createNearbyService(env, options = {}) {
               claimToken: refreshClaimToken, failureCode: 'LIVE_PROVIDER_FAILURE', providersAttempted: liveAttempted,
               providersSucceeded: liveSucceeded,
             });
-            diagnostics.emit({ provider: 'discovered', stage: 'refresh_failure',
+            diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
               coverageState: COVERAGE_STATES.REFRESH_FAILED, errorCode: 'LIVE_PROVIDER_FAILURE' });
           } else {
             await discoveredProvider.completeRefresh(plan.providerParams, { ...outcome, claimToken: refreshClaimToken });
-            diagnostics.emit({ provider: 'discovered', stage: 'refresh_complete',
+            diagnostics.emit({ provider: 'discovered', stage: 'coverage_complete',
               coverageState: outcome.status, resultCount: outcome.resultCount,
               coverageComplete: outcome.coverageComplete });
           }
         } catch (error) {
-          diagnostics.emit({ provider: 'discovered', stage: 'refresh_failure',
+          diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
             errorCode: 'COVERAGE_WRITE_FAILED', errorClass: safeErrorClass(error) });
         }
       }

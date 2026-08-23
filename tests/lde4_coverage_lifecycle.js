@@ -110,6 +110,45 @@ test('atomic claim contract allows one concurrent owner and later recovery', asy
   assert.match(migration, /interval '90 seconds'/); assert.match(migration, /interval '60 seconds'/);
   assert.match(migration, /refresh_claim_token=v_claim_token/);
 });
+test('completion and failure require the same active unexpired claim ownership', () => {
+  const ownershipPredicate = /coverage_status='REFRESHING'\s+and refresh_claimed_until is not null and refresh_claimed_until>v_now\s+and refresh_claim_token=v_claim_token/g;
+  assert.equal([...migration.matchAll(ownershipPredicate)].length, 2);
+
+  function lifecycleModel() {
+    return { status: 'PARTIAL', lastSuccessfulStatus: 'PARTIAL', nextEligibleRefresh: null,
+      token: null, claimedUntil: 0 };
+  }
+  function claim(state, now, token) {
+    if (state.claimedUntil > now || state.nextEligibleRefresh > now) return false;
+    Object.assign(state, { status: 'REFRESHING', token, claimedUntil: now + 90 }); return true;
+  }
+  function finish(state, now, token, operation) {
+    if (state.status !== 'REFRESHING' || state.token !== token || state.claimedUntil <= now) return false;
+    if (operation === 'complete') Object.assign(state, { status: 'SUFFICIENT', lastSuccessfulStatus: 'SUFFICIENT' });
+    else Object.assign(state, { status: 'REFRESH_FAILED', nextEligibleRefresh: now + 60 });
+    Object.assign(state, { token: null, claimedUntil: 0 }); return true;
+  }
+
+  const activeComplete = lifecycleModel(); claim(activeComplete, 0, 'active-complete');
+  assert.equal(finish(activeComplete, 89, 'active-complete', 'complete'), true);
+  const activeFail = lifecycleModel(); claim(activeFail, 0, 'active-fail');
+  assert.equal(finish(activeFail, 89, 'active-fail', 'fail'), true);
+
+  const expired = lifecycleModel(); claim(expired, 0, 'old');
+  const lastKnownGood = expired.lastSuccessfulStatus;
+  assert.equal(finish(expired, 90, 'old', 'complete'), false);
+  assert.equal(finish(expired, 90, 'old', 'fail'), false);
+  assert.equal(expired.status, 'REFRESHING');
+  assert.equal(expired.token, 'old');
+  assert.equal(expired.nextEligibleRefresh, null);
+  assert.equal(expired.lastSuccessfulStatus, lastKnownGood);
+
+  assert.equal(claim(expired, 90, 'replacement'), true);
+  assert.equal(finish(expired, 91, 'old', 'complete'), false);
+  assert.equal(finish(expired, 91, 'old', 'fail'), false);
+  assert.equal(expired.token, 'replacement');
+  assert.equal(finish(expired, 91, 'replacement', 'complete'), true);
+});
 test('refresh outcome is conservative for failures and incomplete chains', () => {
   assert.equal(refreshOutcome({ items: [], limit: 2, liveAttempted: ['geoapify'], liveSucceeded: ['geoapify'], liveFailures: 0, chainComplete: true }).status, 'EXHAUSTED');
   assert.equal(refreshOutcome({ items: [], limit: 2, liveAttempted: ['geoapify'], liveSucceeded: [], liveFailures: 1, chainComplete: true }).status, 'PARTIAL');
@@ -158,6 +197,15 @@ test('lifecycle diagnostics discard location, claim nonce, bodies, credentials a
   assert.equal(events.length, 1);
   assert.deepEqual(Object.keys(events[0]).sort(), ['claimOutcome','coverageState','provider','requestId','resultCount','stage']);
   assert.doesNotMatch(JSON.stringify(events), /11111111|private|48\.2|16\.3|Bearer/i);
+});
+test('coverage completion and failure are the only canonical terminal diagnostic stages', () => {
+  const events = [];
+  const diagnostics = createProviderDiagnostics('lde4-stage-contract', (_message, meta) => events.push(meta));
+  diagnostics.emit({ provider: 'discovered', stage: 'coverage_complete', coverageState: 'SUFFICIENT' });
+  diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure', coverageState: 'REFRESH_FAILED' });
+  diagnostics.emit({ provider: 'discovered', stage: 'refresh_complete', coverageState: 'SUFFICIENT' });
+  diagnostics.emit({ provider: 'discovered', stage: 'refresh_failure', coverageState: 'REFRESH_FAILED' });
+  assert.deepEqual(events.map(({ stage }) => stage), ['coverage_complete', 'coverage_failure']);
 });
 
 (async () => {

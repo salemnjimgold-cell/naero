@@ -151,7 +151,8 @@ begin
       providers_attempted=coalesce(v_attempted,'{}'),providers_succeeded=coalesce(v_succeeded,'{}'),updated_at=v_now
     where cell_id=v_cell and category_key=v_category and radius_bucket=v_radius
       and country_code=v_country and language=v_language and coverage_status='REFRESHING'
-      and refresh_claimed_until>v_now and refresh_claim_token=v_claim_token returning * into v_row;
+      and refresh_claimed_until is not null and refresh_claimed_until>v_now
+      and refresh_claim_token=v_claim_token returning * into v_row;
     if not found then raise exception 'REFRESH_CLAIM_REQUIRED' using errcode='55000'; end if;
     return jsonb_build_object('state',v_status,'resultCount',v_count,'coverageComplete',v_complete);
   end if;
@@ -167,6 +168,7 @@ begin
     providers_attempted=coalesce(v_attempted,'{}'),providers_succeeded=coalesce(v_succeeded,'{}'),updated_at=v_now
   where cell_id=v_cell and category_key=v_category and radius_bucket=v_radius
     and country_code=v_country and language=v_language and coverage_status='REFRESHING'
+    and refresh_claimed_until is not null and refresh_claimed_until>v_now
     and refresh_claim_token=v_claim_token
   returning * into v_row;
   if not found then raise exception 'REFRESH_CLAIM_REQUIRED' using errcode='55000'; end if;

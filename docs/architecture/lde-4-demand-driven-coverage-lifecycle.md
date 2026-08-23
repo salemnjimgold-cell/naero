@@ -49,7 +49,7 @@ Both default to false. With intelligence disabled, behavior is exactly LDE-3. De
 
 Coverage identity uses the existing coarse cell ID plus category, radius bucket, country, and language. Tables and RPCs remain forced-RLS/service-role-only. Logs never contain the cell ID, coordinates, URLs, bodies, headers, credentials, or user/device/session identity.
 
-Allowlisted diagnostics contain request correlation, lifecycle stage, state, claim outcome, bounded count, completeness, safe error code, elapsed time, and whether live traffic was suppressed.
+Allowlisted lifecycle stages are `coverage_read`, `coverage_decision`, `refresh_claim`, `coverage_complete`, and `coverage_failure`. Diagnostics contain request correlation, state, claim outcome, bounded count, completeness, safe error code, elapsed time, and whether live traffic was suppressed.
 
 ## Provider cost and licensing
 

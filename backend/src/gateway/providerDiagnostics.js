@@ -5,7 +5,7 @@ const PROVIDERS = new Set(['naero', 'discovered', 'geoapify', 'google', 'osm']);
 const STAGES = new Set([
   'provider_start', 'request', 'http_response', 'parse', 'normalization',
   'provider_success', 'provider_failure', 'circuit_open', 'circuit_probe', 'circuit_closed',
-  'coverage_read', 'coverage_decision', 'refresh_claim', 'refresh_complete', 'refresh_failure',
+  'coverage_read', 'coverage_decision', 'refresh_claim', 'coverage_complete', 'coverage_failure',
 ]);
 const SAFE_ERROR_CLASSES = new Set([
   'AbortError', 'GatewayError', 'SyntaxError', 'TypeError',
