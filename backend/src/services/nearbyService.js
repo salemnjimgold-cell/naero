@@ -65,6 +65,15 @@ function createNearbyService(env, options = {}) {
   const circuit = new Map();
   const now = options.now || Date.now;
   const metrics = options.operationalMetrics || createOperationalMetrics(env, options.metricsOptions || {});
+  function metricIncrement(params, counter, amount = 1, currentTime) {
+    try { return metrics.increment(params, counter, amount, currentTime); } catch { return false; }
+  }
+  function metricProvider(params, provider, outcome, amount = 1) {
+    try { return metrics.observeProvider(params, provider, outcome, amount); } catch { return false; }
+  }
+  function metricResponse(params, response, elapsedMs, currentTime) {
+    try { metrics.observeResponse(params, response, elapsedMs, currentTime); } catch { /* Best effort only. */ }
+  }
 
   function callState(provider, currentTime = now()) {
     const state = circuit.get(provider.name);
@@ -96,9 +105,9 @@ function createNearbyService(env, options = {}) {
     operationalMetrics: metrics,
     async searchNearby(params, context = {}) {
       const requestStartedAt = metrics.enabled ? now() : 0;
-      metrics.increment(params, 'nearbyRequests', 1, requestStartedAt);
+      metricIncrement(params, 'nearbyRequests', 1, requestStartedAt);
       const finish = (response) => {
-        if (metrics.enabled) metrics.observeResponse(params, response, Math.max(0, now() - requestStartedAt), now());
+        if (metrics.enabled) metricResponse(params, response, Math.max(0, now() - requestStartedAt), now());
         return response;
       };
       const diagnostics = createProviderDiagnostics(context.requestId, options.providerDiagnosticsLogger);
@@ -106,7 +115,7 @@ function createNearbyService(env, options = {}) {
       const fresh = plan.cacheable ? cache.get(params) : null;
       const freshResponse = fresh && cachedResponse(fresh, params);
       if (freshResponse) {
-        metrics.increment(params, 'l1FreshHits');
+        metricIncrement(params, 'l1FreshHits');
         return finish(freshResponse);
       }
 
@@ -170,6 +179,11 @@ function createNearbyService(env, options = {}) {
             diagnostics.emit({ provider: 'discovered', stage: 'coverage_decision',
               coverageState: decision.state, liveSuppressed: decision.action !== 'continue' && decision.action !== 'claim_refresh' });
             if (!failures.length && ['suppress_live', 'await_existing', 'backoff'].includes(decision.action)) {
+              const suppressionCounter = {
+                suppress_live: 'coverageLiveSuppressions', await_existing: 'refreshAwaitExistingSuppressions',
+                backoff: 'refreshBackoffSuppressions',
+              }[decision.action];
+              metricIncrement(params, suppressionCounter);
               liveSuppressed = true;
               lifecycleResponseStatus = decision.action === 'suppress_live' ? 'exhausted' : 'partial';
               break;
@@ -185,7 +199,7 @@ function createNearbyService(env, options = {}) {
                 diagnostics.emit({ provider: 'discovered', stage: 'refresh_claim',
                   coverageState: refreshClaimed ? COVERAGE_STATES.REFRESHING : lifecycleState.state,
                   claimOutcome: refreshClaimed ? 'acquired' : 'contended' });
-                metrics.increment(params, refreshClaimed ? 'refreshClaimsAcquired' : 'refreshClaimsContended');
+                metricIncrement(params, refreshClaimed ? 'refreshClaimsAcquired' : 'refreshClaimsContended');
                 if (!refreshClaimed) {
                   liveSuppressed = true;
                   lifecycleResponseStatus = 'partial';
@@ -201,18 +215,20 @@ function createNearbyService(env, options = {}) {
         }
         attempted.push(provider.name);
         if (sourceRole(provider) === 'LIVE') liveAttempted.push(provider.name);
-        if (sourceRole(provider) === 'LIVE') metrics.observeProvider(params, provider.name, 'call');
         const startedAt = now();
         diagnostics.emit({ provider: provider.name, stage: 'provider_start' });
         try {
-          const results = await provider.searchNearby(plan.providerParams, { diagnostics });
+          const results = await provider.searchNearby(plan.providerParams, { diagnostics,
+            onUpstreamAttempt: (providerName) => {
+              metricProvider(params, providerName, 'attempt');
+            } });
           const elapsedMs = Math.max(0, now() - startedAt);
           diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: Array.isArray(results) ? results.length : 0 });
           record(provider, true, diagnostics);
           used.push(provider.name);
           if (sourceRole(provider) === 'LIVE') {
             liveSucceeded.push(provider.name);
-            metrics.observeProvider(params, provider.name, results.length ? 'success' : 'empty');
+            metricProvider(params, provider.name, results.length ? 'success' : 'empty');
           }
           const fetchedAt = new Date(startedAt).toISOString();
           raw.push(...results.map((item) => ({
@@ -233,11 +249,11 @@ function createNearbyService(env, options = {}) {
           const priorItemCount = items.length;
           items = usableResults(raw, params, CACHE_RESULT_CAPACITY);
           if (sourceRole(provider) === 'LIVE') {
-            metrics.observeProvider(params, provider.name, 'yield', Math.max(0, items.length - priorItemCount));
+            metricProvider(params, provider.name, 'yield', Math.max(0, items.length - priorItemCount));
           }
           completedProviders += 1;
           if (isSufficient(items.slice(0, params.limit), params)) {
-            if (sourceRole(provider) === 'DISCOVERED') metrics.increment(params, 'l2SufficientResponses');
+            if (sourceRole(provider) === 'DISCOVERED') metricIncrement(params, 'l2SufficientResponses');
             break;
           }
         } catch (error) {
@@ -247,7 +263,7 @@ function createNearbyService(env, options = {}) {
           failures.push(error);
           if (sourceRole(provider) === 'LIVE') {
             liveFailures += 1;
-            metrics.observeProvider(params, provider.name, 'failure');
+            metricProvider(params, provider.name, 'failure');
           }
           completedProviders += 1;
         }
@@ -266,16 +282,16 @@ function createNearbyService(env, options = {}) {
             });
             diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
               coverageState: COVERAGE_STATES.REFRESH_FAILED, errorCode: 'LIVE_PROVIDER_FAILURE' });
-            metrics.increment(params, 'refreshFailures');
+            metricIncrement(params, 'refreshFailures');
           } else {
             await discoveredProvider.completeRefresh(plan.providerParams, { ...outcome, claimToken: refreshClaimToken });
             diagnostics.emit({ provider: 'discovered', stage: 'coverage_complete',
               coverageState: outcome.status, resultCount: outcome.resultCount,
               coverageComplete: outcome.coverageComplete });
-            metrics.increment(params, 'refreshCompletions');
+            metricIncrement(params, 'refreshCompletions');
           }
         } catch (error) {
-          metrics.increment(params, 'refreshFailures');
+          metricIncrement(params, 'refreshFailures');
           diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
             errorCode: 'COVERAGE_WRITE_FAILED', errorClass: safeErrorClass(error) });
         }
@@ -311,7 +327,7 @@ function createNearbyService(env, options = {}) {
       const stale = plan.cacheable ? cache.get(params, { allowStale: true }) : null;
       const staleResponse = stale && cachedResponse(stale, params, { stale: true, attempted, succeeded: used });
       if (staleResponse?.items.length) {
-        metrics.increment(params, 'l1StaleRescues');
+        metricIncrement(params, 'l1StaleRescues');
         return finish(staleResponse);
       }
       const discovered = providers.find((provider) => sourceRole(provider) === 'DISCOVERED'

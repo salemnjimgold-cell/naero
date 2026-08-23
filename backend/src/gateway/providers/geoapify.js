@@ -76,6 +76,7 @@ function createGeoapifyProvider(env, options = {}) {
       const timer = setTimeout(() => controller.abort(), env.gateway.providerTimeoutMs);
       try {
         diagnostics.emit({ provider: 'geoapify', stage: 'request', attempt: 1 });
+        context.onUpstreamAttempt?.('geoapify');
         const response = await fetchImpl(buildGeoapifyUrl(params, env.providers.geoapifyApiKey), {
           method: 'GET', headers: { accept: 'application/geo+json, application/json' }, signal: controller.signal,
         });

@@ -4,6 +4,9 @@ const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { readEnv } = require('../backend/src/config/env');
 const { createNearbyService } = require('../backend/src/services/nearbyService');
+const { createGeoapifyProvider } = require('../backend/src/gateway/providers/geoapify');
+const { createGooglePlacesProvider } = require('../backend/src/gateway/providers/googlePlaces');
+const { createOverpassProvider } = require('../backend/src/gateway/providers/overpass');
 const {
   COUNTERS, MAX_INCREMENT, createOperationalMetrics, metricDimensions, operationalRegion, rpcBody,
 } = require('../backend/src/gateway/operationalMetrics');
@@ -45,6 +48,17 @@ test('coarse region aggregates nearby coordinates and differs from fine discover
   assert.match(first, /^op5-v1:\d+:\d+:\d+$/);
   assert.doesNotMatch(first, /48|16\.37/);
   assert.ok(!first.startsWith('nearby-v2'));
+});
+
+test('coarse region safely handles hemispheres, wrap, poles and invalid coordinates', () => {
+  for (const [latitude, longitude] of [[45, 45], [-45, -45], [0, 179.999], [0, -180], [89.999, 10], [-89.999, -10]]) {
+    assert.match(operationalRegion(latitude, longitude), /^op5-v1:\d+:\d+:\d+$/);
+  }
+  assert.match(operationalRegion(0, 180), /^op5-v1:\d+:\d+:\d+$/);
+  assert.match(operationalRegion(0, -180), /^op5-v1:\d+:\d+:\d+$/);
+  for (const pair of [[Infinity, 0], [NaN, 0], [91, 0], [0, 181], [0, -181]]) {
+    assert.equal(operationalRegion(...pair), null);
+  }
 });
 
 test('persisted dimensions contain only bounded aggregate identity', () => {
@@ -110,7 +124,8 @@ test('nearby observation records existing provider decisions without changing re
   const metrics = createOperationalMetrics(env());
   let calls = 0;
   const geoapify = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
-    searchNearby: async () => { calls += 1; return [result('one'), result('two', 48.2084)]; } };
+    searchNearby: async (_params, context) => { calls += 1; context.onUpstreamAttempt('geoapify');
+      return [result('one'), result('two', 48.2084)]; } };
   const service = createNearbyService(env(), { providers: [geoapify], operationalMetrics: metrics });
   const first = await service.searchNearby(params);
   const second = await service.searchNearby(params);
@@ -119,7 +134,7 @@ test('nearby observation records existing provider decisions without changing re
   assert.equal(calls, 1);
   const aggregate = metrics.snapshot()[0];
   assert.equal(aggregate.nearbyRequests, 2);
-  assert.equal(aggregate.geoapifyCalls, 1);
+  assert.equal(aggregate.geoapifyAttempts, 1);
   assert.equal(aggregate.geoapifySuccesses, 1);
   assert.equal(aggregate.geoapifyYield, 2);
   assert.equal(aggregate.l1FreshHits, 1);
@@ -135,7 +150,7 @@ test('persistent discovered sufficiency is measured and live provider stays supp
       { ...result('d2', 48.2084), provider: 'geoapify', sourceRole: 'DISCOVERED' },
     ] };
   const live = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
-    searchNearby: async () => { liveCalls += 1; return []; } };
+    searchNearby: async (_params, context) => { liveCalls += 1; context.onUpstreamAttempt('geoapify'); return []; } };
   const response = await createNearbyService(env(), { providers: [discovered, live],
     operationalMetrics: metrics }).searchNearby(params);
   assert.equal(response.items.length, 2);
@@ -153,7 +168,8 @@ test('LDE-4 claim acquisition, completion, contention and live empty outcomes ar
     claimRefresh: async () => ({ claimed, claimToken: claimed ? '00000000-0000-4000-8000-000000000001' : null }),
     completeRefresh: async () => ({ state: 'EXHAUSTED' }), failRefresh: async () => ({ state: 'REFRESH_FAILED' }),
     searchNearby: async () => [] };
-  const live = { name: 'geoapify', sourceRole: 'LIVE', configured: true, searchNearby: async () => [] };
+  const live = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
+    searchNearby: async (_params, context) => { context.onUpstreamAttempt('geoapify'); return []; } };
   const service = createNearbyService(env(), { providers: [discovered, live], operationalMetrics: metrics });
   const first = await service.searchNearby(params);
   assert.equal(first.coverageStatus, 'exhausted');
@@ -165,11 +181,38 @@ test('LDE-4 claim acquisition, completion, contention and live empty outcomes ar
   assert.equal(aggregate.refreshClaimsAcquired, 1);
   assert.equal(aggregate.refreshCompletions, 1);
   assert.equal(aggregate.refreshClaimsContended, 1);
-  assert.equal(aggregate.geoapifyCalls, 1);
-  assert.equal(aggregate.geoapifyEmpty, 1);
+  assert.equal(aggregate.geoapifyAttempts, 1);
+  assert.equal(aggregate.geoapifyEmptyResults, 1);
   assert.equal(aggregate.exhaustedResponses, 1);
   assert.equal(aggregate.partialResponses, 1);
   metrics.close();
+});
+
+test('await-existing, backoff and valid-coverage suppression remain distinct', async () => {
+  const cases = [
+    [{ state: 'REFRESHING' }, 'refreshAwaitExistingSuppressions'],
+    [{ state: 'REFRESH_FAILED' }, 'refreshBackoffSuppressions'],
+    [{ state: 'EXHAUSTED', coverageComplete: true, resultCount: 0 }, 'coverageLiveSuppressions'],
+  ];
+  for (const [coverageState, intendedCounter] of cases) {
+    const metrics = createOperationalMetrics(env());
+    let liveCalls = 0;
+    const discovered = { name: 'discovered', sourceRole: 'DISCOVERED', configured: true,
+      coverageEnabled: true, demandRefreshEnabled: true, readCoverage: async () => coverageState,
+      searchNearby: async () => [] };
+    const live = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
+      searchNearby: async () => { liveCalls += 1; return []; } };
+    const response = await createNearbyService(env(), { providers: [discovered, live],
+      operationalMetrics: metrics }).searchNearby(params);
+    assert.equal(liveCalls, 0);
+    assert.equal(response.liveSuppressed, true);
+    const aggregate = metrics.snapshot()[0];
+    for (const counter of ['refreshAwaitExistingSuppressions', 'refreshBackoffSuppressions', 'coverageLiveSuppressions']) {
+      assert.equal(aggregate[counter], counter === intendedCounter ? 1 : 0);
+    }
+    assert.equal(aggregate.refreshClaimsContended, 0);
+    metrics.close();
+  }
 });
 
 test('live provider and refresh failure counters observe existing failure handling', async () => {
@@ -180,14 +223,103 @@ test('live provider and refresh failure counters observe existing failure handli
     claimRefresh: async () => ({ claimed: true, claimToken: '00000000-0000-4000-8000-000000000002' }),
     failRefresh: async () => ({ state: 'REFRESH_FAILED' }), searchNearby: async () => [] };
   const live = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
-    searchNearby: async () => { throw Object.assign(new Error('fixture'), { code: 'PROVIDER_UNAVAILABLE' }); } };
+    searchNearby: async (_params, context) => { context.onUpstreamAttempt('geoapify');
+      throw Object.assign(new Error('fixture'), { code: 'PROVIDER_UNAVAILABLE' }); } };
   await assert.rejects(() => createNearbyService(env(), { providers: [discovered, live],
     operationalMetrics: metrics }).searchNearby(params));
   const aggregate = metrics.snapshot()[0];
-  assert.equal(aggregate.geoapifyCalls, 1);
+  assert.equal(aggregate.geoapifyAttempts, 1);
   assert.equal(aggregate.geoapifyFailures, 1);
   assert.equal(aggregate.refreshFailures, 1);
   metrics.close();
+});
+
+function osmPayload() {
+  return { elements: [{ type: 'node', id: 1, lat: 48.2083, lon: 16.3738,
+    tags: { name: 'OSM Hospital', amenity: 'hospital', 'addr:country': 'AT' } }] };
+}
+function response(status, payload = {}) {
+  return { ok: status >= 200 && status < 300, status, json: async () => payload };
+}
+function providerEnv(provider, metricsEnabled = true) {
+  return { gateway: { providerTimeoutMs: 100, operationalMetricsEnabled: metricsEnabled,
+    operationalMetricsPersistenceEnabled: false, nearbyCache: { ttlMs: 300000, staleMs: 1800000 } },
+  providers: { geoapifyApiKey: provider === 'geoapify' ? 'test-placeholder' : '',
+    googlePlacesApiKey: provider === 'google' ? 'test-placeholder' : '',
+    overpassApiUrl: provider === 'osm' ? 'https://overpass.test.invalid/api/interpreter' : '' },
+  supabase: { url: '', serviceRoleKey: '' } };
+}
+async function runOsmSequence(statuses) {
+  const metricsEnv = providerEnv('osm');
+  const metrics = createOperationalMetrics(metricsEnv);
+  let fetches = 0;
+  const provider = createOverpassProvider(metricsEnv, { sleep: async () => {}, fetchImpl: async () => {
+    const status = statuses[fetches++]; return response(status, status === 200 ? osmPayload() : {});
+  } });
+  const service = createNearbyService(metricsEnv, { providers: [provider], operationalMetrics: metrics });
+  let outcome;
+  try { outcome = await service.searchNearby(params); } catch (error) { outcome = error; }
+  return { metrics, aggregate: metrics.snapshot()[0], fetches, outcome };
+}
+
+test('OSM no-retry request counts one attempt and one final success', async () => {
+  const run = await runOsmSequence([200]);
+  assert.equal(run.fetches, 1); assert.equal(run.aggregate.osmAttempts, 1);
+  assert.equal(run.aggregate.osmSuccesses, 1); assert.equal(run.aggregate.osmFailures, 0);
+  assert.equal(run.aggregate.osmYield, 1); run.metrics.close();
+});
+for (const retryStatus of [500, 429]) {
+  test(`OSM ${retryStatus} retry counts two attempts and one final success`, async () => {
+    const run = await runOsmSequence([retryStatus, 200]);
+    assert.equal(run.fetches, 2); assert.equal(run.aggregate.osmAttempts, 2);
+    assert.equal(run.aggregate.osmSuccesses, 1); assert.equal(run.aggregate.osmFailures, 0);
+    assert.equal(run.aggregate.osmYield, 1); run.metrics.close();
+  });
+}
+test('OSM final failure after retry counts two attempts and one final failure', async () => {
+  const run = await runOsmSequence([500, 503]);
+  assert.equal(run.fetches, 2); assert.equal(run.aggregate.osmAttempts, 2);
+  assert.equal(run.aggregate.osmSuccesses, 0); assert.equal(run.aggregate.osmFailures, 1);
+  assert.equal(run.aggregate.osmYield, 0); assert.equal(run.outcome.code, 'PROVIDER_UNAVAILABLE'); run.metrics.close();
+});
+
+test('Geoapify and Google each count exactly one actual fetch attempt', async () => {
+  const cases = [
+    ['geoapify', createGeoapifyProvider, { type: 'FeatureCollection', features: [] }],
+    ['google', createGooglePlacesProvider, { places: [] }],
+  ];
+  for (const [name, factory, payload] of cases) {
+    const metricsEnv = providerEnv(name);
+    const metrics = createOperationalMetrics(metricsEnv);
+    let fetches = 0;
+    const provider = factory(metricsEnv, { fetchImpl: async () => { fetches += 1; return response(200, payload); } });
+    const resultValue = await createNearbyService(metricsEnv, { providers: [provider], operationalMetrics: metrics }).searchNearby(params);
+    assert.equal(fetches, 1); assert.equal(metrics.snapshot()[0][`${name}Attempts`], 1);
+    assert.equal(metrics.snapshot()[0][`${name}EmptyResults`], 1); assert.equal(resultValue.items.length, 0);
+    metrics.close();
+  }
+});
+
+test('metrics instrumentation does not amplify provider traffic and callback failure is isolated', async () => {
+  async function execute(metricsEnabled, injectedMetrics = null) {
+    const metricsEnv = providerEnv('geoapify', metricsEnabled);
+    let fetches = 0;
+    const provider = createGeoapifyProvider(metricsEnv, { fetchImpl: async () => {
+      fetches += 1; return response(200, { type: 'FeatureCollection', features: [] });
+    } });
+    const service = createNearbyService(metricsEnv, { providers: [provider],
+      ...(injectedMetrics ? { operationalMetrics: injectedMetrics } : {}) });
+    const resultValue = await service.searchNearby(params);
+    service.operationalMetrics.close?.();
+    return { fetches, resultValue };
+  }
+  const disabled = await execute(false);
+  const enabled = await execute(true);
+  assert.equal(disabled.fetches, 1); assert.equal(enabled.fetches, 1);
+  assert.deepEqual(enabled.resultValue.items, disabled.resultValue.items);
+  const safeNoop = { enabled: true, increment() {}, observeResponse() {}, close() {},
+    observeProvider() { throw new Error('telemetry fixture failure'); } };
+  assert.equal((await execute(true, safeNoop)).fetches, 1);
 });
 
 test('migration is additive, bounded, atomic, RLS-forced and service-role-only', () => {
@@ -199,6 +331,7 @@ test('migration is additive, bounded, atomic, RLS-forced and service-role-only',
   assert.match(migration, /force row level security/i);
   assert.match(migration, /auth\.role\(\)<>'service_role'/i);
   assert.match(migration, /security definer set search_path=public,extensions/i);
+  assert.match(migration, /is_valid_operational_region/);
   assert.match(migration, /revoke all on table public\.discovery_operational_metrics_daily from public,anon,authenticated/i);
   assert.doesNotMatch(migration, /jsonb|dynamic|execute format/i);
 });
@@ -249,8 +382,8 @@ test('representative nearby benchmark covers disabled, collection and mocked per
   const iterations = 500;
   async function benchmark(metricsEnv, metricsOptions = {}) {
     const operationalMetrics = createOperationalMetrics(metricsEnv, metricsOptions);
-    const provider = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
-      searchNearby: async () => [result('benchmark')] };
+  const provider = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
+      searchNearby: async (_params, context) => { context.onUpstreamAttempt('geoapify'); return [result('benchmark')]; } };
     const service = createNearbyService(metricsEnv, { providers: [provider], operationalMetrics });
     const benchmarkParams = { ...params, limit: 1 };
     const samples = [];

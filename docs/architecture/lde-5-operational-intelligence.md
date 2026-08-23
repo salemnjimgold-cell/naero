@@ -4,13 +4,15 @@ LDE-5 observes the accepted nearby resolver. It does not acquire places, enforce
 
 ## Measurements
 
-Daily aggregates measure nearby requests, L1 fresh and stale use, L2 sufficiency, LDE-4 claim acquisition/contention/completion/failure, live-provider calls/outcomes/net normalized yield, final partial/stale/exhausted responses, and bounded latency buckets. Provider usage is measured in neutral request and result units; no monetary price is assumed.
+Daily aggregates measure nearby requests, L1 fresh and stale use, L2 sufficiency, LDE-4 claim acquisition/contention/completion/failure and distinct suppression decisions, live-provider upstream attempts/final outcomes/net normalized yield, final partial/stale/exhausted responses, and bounded latency buckets. Provider usage is measured in neutral request and result units; no monetary price is assumed.
+
+An upstream attempt is counted immediately before each real Geoapify, Google, or OSM fetch. OSM retries therefore count as separate attempts. Success, empty result, failure, and normalized yield describe the final resolver-level provider execution and are counted once regardless of retries.
 
 ## Privacy boundary
 
 Metrics never contain exact coordinates, fine discovery-cell IDs, user/account/device/session/request identity, IP addresses, language, request URLs, provider URLs, headers, bodies, tokens, place identities, or movement sequences.
 
-The server derives an `op5-v1` operational region using a latitude-adjusted approximately 5 km grid. The identifier exposes a coarse aggregate grid location and is not claimed to be cryptographically irreversible. It is deliberately distinct from the approximately 500 m L1/L2 cell. Metrics use only UTC day, coarse region, country, canonical category, and radius bucket. There is no per-request metrics table.
+The server derives an `op5-v1` operational region using a latitude-adjusted approximately 5 km grid. The identifier exposes a coarse aggregate grid location and is not claimed to be cryptographically irreversible. It is deliberately distinct from the approximately 500 m L1/L2 cell. Migration 008 mirrors the grid bounds: latitude index 0–4007, the longitude-cell count calculated for that latitude band, and a longitude index smaller than that count. Metrics use only UTC day, coarse region, country, canonical category, and radius bucket. There is no per-request metrics table.
 
 ## Aggregation and failure
 

@@ -44,13 +44,14 @@ function createGooglePlacesProvider(env, options = {}) {
     normalizeResult: normalizeGooglePlace,
     async healthCheck() { return { configured: this.configured, healthy: this.configured }; },
     async getPlaceDetails() { throw new GatewayError('PROVIDER_UNAVAILABLE', 'Google place details are deferred.'); },
-    async searchNearby(params) {
+    async searchNearby(params, context = {}) {
       if (!this.configured) throw new GatewayError('PROVIDER_NOT_CONFIGURED', 'Google Places is not configured.');
       const types = getCategory(params.category)?.google || [];
       if (!types.length) throw new GatewayError('INVALID_CATEGORY', 'This category is not supported by Google Places.');
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), env.gateway.providerTimeoutMs);
       try {
+        context.onUpstreamAttempt?.('google');
         const response = await fetchImpl('https://places.googleapis.com/v1/places:searchNearby', {
           method: 'POST',
           headers: {

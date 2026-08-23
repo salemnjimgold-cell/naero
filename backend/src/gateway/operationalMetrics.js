@@ -12,11 +12,12 @@ const LIVE_PROVIDERS = Object.freeze(['geoapify', 'google', 'osm']);
 const BASE_COUNTERS = Object.freeze([
   'nearbyRequests', 'l1FreshHits', 'l1StaleRescues', 'l2SufficientResponses',
   'refreshClaimsAcquired', 'refreshClaimsContended', 'refreshCompletions', 'refreshFailures',
+  'refreshAwaitExistingSuppressions', 'refreshBackoffSuppressions', 'coverageLiveSuppressions',
   'partialResponses', 'staleResponses', 'exhaustedResponses',
   'latencyLt10Ms', 'latencyLt50Ms', 'latencyLt250Ms', 'latencyLt1000Ms', 'latencyGte1000Ms',
 ]);
 const PROVIDER_COUNTERS = Object.freeze(LIVE_PROVIDERS.flatMap((provider) => [
-  `${provider}Calls`, `${provider}Successes`, `${provider}Empty`, `${provider}Failures`, `${provider}Yield`,
+  `${provider}Attempts`, `${provider}Successes`, `${provider}EmptyResults`, `${provider}Failures`, `${provider}Yield`,
 ]));
 const COUNTERS = Object.freeze([...BASE_COUNTERS, ...PROVIDER_COUNTERS]);
 
@@ -70,7 +71,7 @@ function safeIncrement(value) {
 
 function providerCounter(provider, outcome) {
   if (!LIVE_PROVIDERS.includes(provider)) return null;
-  const suffix = { call: 'Calls', success: 'Successes', empty: 'Empty', failure: 'Failures', yield: 'Yield' }[outcome];
+  const suffix = { attempt: 'Attempts', success: 'Successes', empty: 'EmptyResults', failure: 'Failures', yield: 'Yield' }[outcome];
   return suffix ? `${provider}${suffix}` : null;
 }
 
