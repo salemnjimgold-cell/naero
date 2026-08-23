@@ -9,6 +9,7 @@ const { createDiscoveredPlacesProvider } = require('../gateway/providers/discove
 const { createProviderDiagnostics, safeErrorClass } = require('../gateway/providerDiagnostics');
 const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('../gateway/resolverPolicy');
 const { COVERAGE_STATES, coverageDecision, refreshOutcome } = require('../gateway/coverageLifecycle');
+const { createOperationalMetrics } = require('../gateway/operationalMetrics');
 
 const CACHE_RESULT_CAPACITY = 50;
 
@@ -63,6 +64,16 @@ function createNearbyService(env, options = {}) {
   const cache = options.cache || createNearbyCache(env.gateway.nearbyCache || { ttlMs: 300000, staleMs: 1800000 });
   const circuit = new Map();
   const now = options.now || Date.now;
+  const metrics = options.operationalMetrics || createOperationalMetrics(env, options.metricsOptions || {});
+  function metricIncrement(params, counter, amount = 1, currentTime) {
+    try { return metrics.increment(params, counter, amount, currentTime); } catch { return false; }
+  }
+  function metricProvider(params, provider, outcome, amount = 1) {
+    try { return metrics.observeProvider(params, provider, outcome, amount); } catch { return false; }
+  }
+  function metricResponse(params, response, elapsedMs, currentTime) {
+    try { metrics.observeResponse(params, response, elapsedMs, currentTime); } catch { /* Best effort only. */ }
+  }
 
   function callState(provider, currentTime = now()) {
     const state = circuit.get(provider.name);
@@ -91,12 +102,22 @@ function createNearbyService(env, options = {}) {
   return {
     providers,
     cache,
+    operationalMetrics: metrics,
     async searchNearby(params, context = {}) {
+      const requestStartedAt = metrics.enabled ? now() : 0;
+      metricIncrement(params, 'nearbyRequests', 1, requestStartedAt);
+      const finish = (response) => {
+        if (metrics.enabled) metricResponse(params, response, Math.max(0, now() - requestStartedAt), now());
+        return response;
+      };
       const diagnostics = createProviderDiagnostics(context.requestId, options.providerDiagnosticsLogger);
       const plan = cachePlan(params);
       const fresh = plan.cacheable ? cache.get(params) : null;
       const freshResponse = fresh && cachedResponse(fresh, params);
-      if (freshResponse) return freshResponse;
+      if (freshResponse) {
+        metricIncrement(params, 'l1FreshHits');
+        return finish(freshResponse);
+      }
 
       const discoveredProvider = providers.find((provider) => sourceRole(provider) === 'DISCOVERED');
       let lifecycleState = { state: COVERAGE_STATES.UNSEEN };
@@ -158,6 +179,11 @@ function createNearbyService(env, options = {}) {
             diagnostics.emit({ provider: 'discovered', stage: 'coverage_decision',
               coverageState: decision.state, liveSuppressed: decision.action !== 'continue' && decision.action !== 'claim_refresh' });
             if (!failures.length && ['suppress_live', 'await_existing', 'backoff'].includes(decision.action)) {
+              const suppressionCounter = {
+                suppress_live: 'coverageLiveSuppressions', await_existing: 'refreshAwaitExistingSuppressions',
+                backoff: 'refreshBackoffSuppressions',
+              }[decision.action];
+              metricIncrement(params, suppressionCounter);
               liveSuppressed = true;
               lifecycleResponseStatus = decision.action === 'suppress_live' ? 'exhausted' : 'partial';
               break;
@@ -173,6 +199,7 @@ function createNearbyService(env, options = {}) {
                 diagnostics.emit({ provider: 'discovered', stage: 'refresh_claim',
                   coverageState: refreshClaimed ? COVERAGE_STATES.REFRESHING : lifecycleState.state,
                   claimOutcome: refreshClaimed ? 'acquired' : 'contended' });
+                metricIncrement(params, refreshClaimed ? 'refreshClaimsAcquired' : 'refreshClaimsContended');
                 if (!refreshClaimed) {
                   liveSuppressed = true;
                   lifecycleResponseStatus = 'partial';
@@ -191,12 +218,13 @@ function createNearbyService(env, options = {}) {
         const startedAt = now();
         diagnostics.emit({ provider: provider.name, stage: 'provider_start' });
         try {
-          const results = await provider.searchNearby(plan.providerParams, { diagnostics });
-          const elapsedMs = Math.max(0, now() - startedAt);
-          diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: Array.isArray(results) ? results.length : 0 });
-          record(provider, true, diagnostics);
-          used.push(provider.name);
-          if (sourceRole(provider) === 'LIVE') liveSucceeded.push(provider.name);
+          const results = await provider.searchNearby(plan.providerParams, { diagnostics,
+            onUpstreamAttempt: (providerName) => {
+              metricProvider(params, providerName, 'attempt');
+            } });
+          if (!Array.isArray(results)) {
+            throw new GatewayError('PROVIDER_UNAVAILABLE', 'Nearby provider returned an invalid result collection.');
+          }
           const fetchedAt = new Date(startedAt).toISOString();
           raw.push(...results.map((item) => ({
             ...item,
@@ -213,15 +241,32 @@ function createNearbyService(env, options = {}) {
               }
             }
           }
+          const priorItemCount = items.length;
           items = usableResults(raw, params, CACHE_RESULT_CAPACITY);
+          const providerYield = Math.max(0, items.length - priorItemCount);
+          const elapsedMs = Math.max(0, now() - startedAt);
+          diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: results.length });
+          record(provider, true, diagnostics);
+          used.push(provider.name);
+          if (sourceRole(provider) === 'LIVE') {
+            liveSucceeded.push(provider.name);
+            metricProvider(params, provider.name, results.length ? 'success' : 'empty');
+            metricProvider(params, provider.name, 'yield', providerYield);
+          }
           completedProviders += 1;
-          if (isSufficient(items.slice(0, params.limit), params)) break;
+          if (isSufficient(items.slice(0, params.limit), params)) {
+            if (sourceRole(provider) === 'DISCOVERED') metricIncrement(params, 'l2SufficientResponses');
+            break;
+          }
         } catch (error) {
           const elapsedMs = Math.max(0, now() - startedAt);
           diagnostics.emit({ provider: provider.name, stage: 'provider_failure', elapsedMs, errorCode: error?.code, errorClass: safeErrorClass(error) });
           record(provider, false, diagnostics);
           failures.push(error);
-          if (sourceRole(provider) === 'LIVE') liveFailures += 1;
+          if (sourceRole(provider) === 'LIVE') {
+            liveFailures += 1;
+            metricProvider(params, provider.name, 'failure');
+          }
           completedProviders += 1;
         }
       }
@@ -239,13 +284,16 @@ function createNearbyService(env, options = {}) {
             });
             diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
               coverageState: COVERAGE_STATES.REFRESH_FAILED, errorCode: 'LIVE_PROVIDER_FAILURE' });
+            metricIncrement(params, 'refreshFailures');
           } else {
             await discoveredProvider.completeRefresh(plan.providerParams, { ...outcome, claimToken: refreshClaimToken });
             diagnostics.emit({ provider: 'discovered', stage: 'coverage_complete',
               coverageState: outcome.status, resultCount: outcome.resultCount,
               coverageComplete: outcome.coverageComplete });
+            metricIncrement(params, 'refreshCompletions');
           }
         } catch (error) {
+          metricIncrement(params, 'refreshFailures');
           diagnostics.emit({ provider: 'discovered', stage: 'coverage_failure',
             errorCode: 'COVERAGE_WRITE_FAILED', errorClass: safeErrorClass(error) });
         }
@@ -264,7 +312,7 @@ function createNearbyService(env, options = {}) {
           partial: failures.length > 0 || lifecycleResponseStatus === 'partial',
         };
         if (plan.cacheable) cache.set(params, value);
-        return {
+        return finish({
           items: responseItems,
           providers: used,
           attributions: [...new Set(responseItems.map((item) => item.sourceAttribution).filter(Boolean))],
@@ -275,22 +323,25 @@ function createNearbyService(env, options = {}) {
           cached: false,
           stale: false,
           liveSuppressed,
-        };
+        });
       }
 
       const stale = plan.cacheable ? cache.get(params, { allowStale: true }) : null;
       const staleResponse = stale && cachedResponse(stale, params, { stale: true, attempted, succeeded: used });
-      if (staleResponse?.items.length) return staleResponse;
+      if (staleResponse?.items.length) {
+        metricIncrement(params, 'l1StaleRescues');
+        return finish(staleResponse);
+      }
       const discovered = providers.find((provider) => sourceRole(provider) === 'DISCOVERED'
         && provider.configured && typeof provider.searchStale === 'function');
       if (discovered) {
         try {
           const staleItems = usableResults(await discovered.searchStale(plan.providerParams), params,
             CACHE_RESULT_CAPACITY).slice(0, params.limit);
-          if (staleItems.length) return { items: staleItems, providers: ['discovered'],
+          if (staleItems.length) return finish({ items: staleItems, providers: ['discovered'],
             attributions: [...new Set(staleItems.map((item) => item.sourceAttribution).filter(Boolean))],
             cached: false, stale: true, partial: true, coverageStatus: 'stale',
-            sourcesAttempted: attempted, sourcesSucceeded: used };
+            sourcesAttempted: attempted, sourcesSucceeded: used });
         } catch { /* Preserve the primary safe provider failure. */ }
       }
       const timedOut = failures.length && failures.every((error) => error.code === 'PROVIDER_TIMEOUT');

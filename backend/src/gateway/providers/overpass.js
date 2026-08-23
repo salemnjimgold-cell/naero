@@ -66,6 +66,7 @@ function createOverpassProvider(env, options = {}) {
         const timer = setTimeout(() => controller.abort(), env.gateway.providerTimeoutMs);
         try {
           diagnostics.emit({ provider: 'osm', stage: 'request', attempt: attemptNumber });
+          context.onUpstreamAttempt?.('osm');
           const response = await fetchImpl(env.providers.overpassApiUrl, {
             method: 'POST',
             headers: {
