@@ -222,13 +222,8 @@ function createNearbyService(env, options = {}) {
             onUpstreamAttempt: (providerName) => {
               metricProvider(params, providerName, 'attempt');
             } });
-          const elapsedMs = Math.max(0, now() - startedAt);
-          diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: Array.isArray(results) ? results.length : 0 });
-          record(provider, true, diagnostics);
-          used.push(provider.name);
-          if (sourceRole(provider) === 'LIVE') {
-            liveSucceeded.push(provider.name);
-            metricProvider(params, provider.name, results.length ? 'success' : 'empty');
+          if (!Array.isArray(results)) {
+            throw new GatewayError('PROVIDER_UNAVAILABLE', 'Nearby provider returned an invalid result collection.');
           }
           const fetchedAt = new Date(startedAt).toISOString();
           raw.push(...results.map((item) => ({
@@ -248,8 +243,15 @@ function createNearbyService(env, options = {}) {
           }
           const priorItemCount = items.length;
           items = usableResults(raw, params, CACHE_RESULT_CAPACITY);
+          const providerYield = Math.max(0, items.length - priorItemCount);
+          const elapsedMs = Math.max(0, now() - startedAt);
+          diagnostics.emit({ provider: provider.name, stage: 'provider_success', elapsedMs, resultCount: results.length });
+          record(provider, true, diagnostics);
+          used.push(provider.name);
           if (sourceRole(provider) === 'LIVE') {
-            metricProvider(params, provider.name, 'yield', Math.max(0, items.length - priorItemCount));
+            liveSucceeded.push(provider.name);
+            metricProvider(params, provider.name, results.length ? 'success' : 'empty');
+            metricProvider(params, provider.name, 'yield', providerYield);
           }
           completedProviders += 1;
           if (isSufficient(items.slice(0, params.limit), params)) {

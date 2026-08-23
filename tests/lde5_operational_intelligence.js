@@ -300,6 +300,53 @@ test('Geoapify and Google each count exactly one actual fetch attempt', async ()
   }
 });
 
+async function runOutcomeCase(resultOrError) {
+  const metricsEnv = providerEnv('geoapify');
+  const metrics = createOperationalMetrics(metricsEnv);
+  const provider = { name: 'geoapify', sourceRole: 'LIVE', configured: true,
+    searchNearby: async (_params, context) => {
+      context.onUpstreamAttempt('geoapify');
+      if (resultOrError instanceof Error) throw resultOrError;
+      return resultOrError;
+    } };
+  let outcome;
+  try {
+    outcome = await createNearbyService(metricsEnv, { providers: [provider], operationalMetrics: metrics,
+      providerDiagnosticsLogger: () => {} }).searchNearby(params);
+  } catch (error) { outcome = error; }
+  const aggregate = metrics.snapshot()[0];
+  const finalOutcomes = aggregate.geoapifySuccesses + aggregate.geoapifyEmptyResults + aggregate.geoapifyFailures;
+  return { metrics, aggregate, finalOutcomes, outcome };
+}
+
+test('provider final outcomes are mutually exclusive for valid, malformed and failed results', async () => {
+  const processingFailure = {};
+  Object.defineProperty(processingFailure, 'name', { enumerable: true, get() { throw new Error('processing fixture'); } });
+  const cases = [
+    [[result('valid')], 'success', 1],
+    [[], 'empty', 0],
+    [null, 'failure', 0],
+    [undefined, 'failure', 0],
+    [{}, 'failure', 0],
+    [{ length: 0 }, 'failure', 0],
+    ['not-an-array', 'failure', 0],
+    [42, 'failure', 0],
+    [new Set(), 'failure', 0],
+    [[processingFailure], 'failure', 0],
+    [new Error('provider fixture'), 'failure', 0],
+  ];
+  for (const [providerResult, expected, expectedYield] of cases) {
+    const run = await runOutcomeCase(providerResult);
+    assert.equal(run.aggregate.geoapifyAttempts, 1);
+    assert.equal(run.finalOutcomes, 1);
+    assert.equal(run.aggregate.geoapifySuccesses, expected === 'success' ? 1 : 0);
+    assert.equal(run.aggregate.geoapifyEmptyResults, expected === 'empty' ? 1 : 0);
+    assert.equal(run.aggregate.geoapifyFailures, expected === 'failure' ? 1 : 0);
+    assert.equal(run.aggregate.geoapifyYield, expectedYield);
+    run.metrics.close();
+  }
+});
+
 test('metrics instrumentation does not amplify provider traffic and callback failure is isolated', async () => {
   async function execute(metricsEnabled, injectedMetrics = null) {
     const metricsEnv = providerEnv('geoapify', metricsEnabled);
