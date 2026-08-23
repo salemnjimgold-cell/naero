@@ -9,7 +9,7 @@ module.exports = defineConfig([
     ignores: ["dist/*"],
   },
   {
-    files: ['backend/**/*.js'],
+    files: ['backend/**/*.js', 'tests/**/*.js'],
     languageOptions: {
       globals: globals.node,
     },

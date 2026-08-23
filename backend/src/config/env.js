@@ -46,6 +46,9 @@ function readEnv(source = process.env) {
   const coverageIntelligenceEnabled = mergedSource.DISCOVERY_COVERAGE_INTELLIGENCE_ENABLED === 'true';
   const demandRefreshEnabled = coverageIntelligenceEnabled
     && mergedSource.DISCOVERY_DEMAND_REFRESH_ENABLED === 'true';
+  const operationalMetricsEnabled = mergedSource.DISCOVERY_OPERATIONAL_METRICS_ENABLED === 'true';
+  const operationalMetricsPersistenceEnabled = operationalMetricsEnabled
+    && mergedSource.DISCOVERY_OPERATIONAL_METRICS_PERSISTENCE_ENABLED === 'true';
   const allowedOrigins = (mergedSource.ALLOWED_ORIGINS || mergedSource.CORS_ORIGINS || '')
     .split(',').map((origin) => origin.trim()).filter(Boolean);
 
@@ -78,6 +81,8 @@ function readEnv(source = process.env) {
       discoveredStoreEnabled,
       coverageIntelligenceEnabled,
       demandRefreshEnabled,
+      operationalMetricsEnabled,
+      operationalMetricsPersistenceEnabled,
       debugLocationLogging: mergedSource.DEBUG_LOCATION_LOGGING === 'true' && mergedSource.NODE_ENV !== 'production',
     },
     providers: {
