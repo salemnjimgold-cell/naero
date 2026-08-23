@@ -10,6 +10,7 @@ const { createProviderDiagnostics, safeErrorClass } = require('../gateway/provid
 const { orderProviders, sourceRole, isSufficient, coverageStatus } = require('../gateway/resolverPolicy');
 const { COVERAGE_STATES, coverageDecision, refreshOutcome } = require('../gateway/coverageLifecycle');
 const { createOperationalMetrics } = require('../gateway/operationalMetrics');
+const { createProviderPolicyShadow } = require('../gateway/providerPolicyShadow');
 
 const CACHE_RESULT_CAPACITY = 50;
 
@@ -65,6 +66,10 @@ function createNearbyService(env, options = {}) {
   const circuit = new Map();
   const now = options.now || Date.now;
   const metrics = options.operationalMetrics || createOperationalMetrics(env, options.metricsOptions || {});
+  let providerPolicy = { evaluate: () => null };
+  try {
+    providerPolicy = options.providerPolicy || createProviderPolicyShadow(env, options.providerPolicyOptions || {});
+  } catch { /* Optional shadow initialization must not affect nearby availability. */ }
   function metricIncrement(params, counter, amount = 1, currentTime) {
     try { return metrics.increment(params, counter, amount, currentTime); } catch { return false; }
   }
@@ -103,6 +108,7 @@ function createNearbyService(env, options = {}) {
     providers,
     cache,
     operationalMetrics: metrics,
+    providerPolicy,
     async searchNearby(params, context = {}) {
       const requestStartedAt = metrics.enabled ? now() : 0;
       metricIncrement(params, 'nearbyRequests', 1, requestStartedAt);
@@ -153,6 +159,11 @@ function createNearbyService(env, options = {}) {
         configured.push(provider);
       }
       if (!configured.length) throw new GatewayError('PROVIDER_NOT_CONFIGURED', 'No nearby provider is configured.');
+
+      // Stage A/B is observation-only. The evaluated proposal never replaces this configured static order.
+      try {
+        providerPolicy.evaluate(params, configured.filter((provider) => sourceRole(provider) === 'LIVE'));
+      } catch { /* Shadow policy must never become a nearby availability dependency. */ }
 
       const raw = [];
       const failures = [];
