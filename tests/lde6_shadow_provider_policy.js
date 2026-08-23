@@ -6,7 +6,8 @@ const { operationalRegion } = require('../backend/src/gateway/operationalMetrics
 const { evaluateProviderPolicy, POLICY_VERSION, PROVIDER_FIELDS, SATURATED_COUNTER,
   validOperationalRegion } = require('../backend/src/gateway/providerPolicy');
 const { createMetricsReader, createPolicyDiagnostics, createPolicySnapshotCache,
-  createProviderPolicyShadow, SELECTED_COLUMNS, SNAPSHOT_MAX_KEYS } = require('../backend/src/gateway/providerPolicyShadow');
+  createProviderPolicyShadow, policyKey, providerSignature, SELECTED_COLUMNS, SNAPSHOT_MAX_KEYS,
+  MAX_IN_FLIGHT_LOADS } = require('../backend/src/gateway/providerPolicyShadow');
 
 const NOW = Date.parse('2026-08-23T12:00:00.000Z');
 const params = { latitude: 48.2, longitude: 16.3, radius: 5000, limit: 2,
@@ -162,6 +163,101 @@ test('snapshot cache hits, expires and remains bounded with deterministic evicti
   assert.equal(bounded.size(), SNAPSHOT_MAX_KEYS);
 });
 
+test('cache identity isolates policy version, ordered provider set and every policy dimension', () => {
+  const base = policyKey(DIMENSIONS, STATIC);
+  assert.equal(typeof base, 'string');
+  assert.notEqual(base, policyKey(DIMENSIONS, ['geoapify', 'osm']));
+  assert.notEqual(base, policyKey(DIMENSIONS, ['osm', 'google', 'geoapify']));
+  assert.notEqual(base, policyKey({ ...DIMENSIONS, category: 'pharmacy' }, STATIC));
+  assert.notEqual(base, policyKey({ ...DIMENSIONS, countryCode: 'SK' }, STATIC));
+  assert.notEqual(base, policyKey({ ...DIMENSIONS, radiusBucket: 5000 }, STATIC));
+  assert.notEqual(base, policyKey({ ...DIMENSIONS,
+    operationalRegion: operationalRegion(47.5, 19.0) }, STATIC));
+  assert.equal(policyKey(DIMENSIONS, STATIC, 'future-policy'), null);
+  for (const providers of [null, undefined, [], ['geoapify', 'geoapify'], ['geoapify', 'hostile'],
+    ['geoapify|google', 'osm']]) assert.equal(policyKey(DIMENSIONS, providers), null);
+  assert.equal(providerSignature(['geoapify', 'google']), '["geoapify","google"]');
+  assert.notEqual(policyKey(DIMENSIONS, ['geoapify', 'google']),
+    policyKey(DIMENSIONS, ['google', 'geoapify']));
+});
+
+test('malformed cached identity fails closed and is never reused', async () => {
+  let reads = 0;
+  const hostileCache = {
+    get: () => ({ key: 'wrong', policyVersion: POLICY_VERSION,
+      providerSignature: '["geoapify","google"]', decision: evaluate() }),
+    set: () => {}, size: () => 0, clear: () => {},
+  };
+  const policy = createProviderPolicyShadow(policyEnv({ providerPolicyShadowEnabled: true }), {
+    cache: hostileCache, now: () => NOW, logger: () => {},
+    readMetrics: async () => { reads += 1; return { ok: false, reasonCode: 'READER_UNAVAILABLE' }; },
+  });
+  const decision = policy.evaluate(params, [{ name: 'geoapify' }, { name: 'google' }]);
+  assert.equal(decision.reasonCode, 'NO_EVIDENCE');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(reads, 1);
+});
+
+test('distinct in-flight analytics loads are bounded without queueing and clean up', async () => {
+  const releases = []; let reads = 0;
+  const policy = createProviderPolicyShadow(policyEnv({ providerPolicyShadowEnabled: true }), {
+    now: () => NOW, logger: () => {}, readMetrics: () => {
+      reads += 1; return new Promise((resolve) => releases.push(resolve));
+    },
+  });
+  const providers = [{ name: 'geoapify' }, { name: 'google' }];
+  const decisions = [];
+  for (let index = 0; index < MAX_IN_FLIGHT_LOADS + 25; index += 1) {
+    decisions.push(policy.evaluate({ ...params, latitude: -70 + index }, providers));
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(policy.pendingCount(), MAX_IN_FLIGHT_LOADS);
+  assert.equal(reads, MAX_IN_FLIGHT_LOADS);
+  assert.equal(decisions.every((decision) => decision.reasonCode === 'NO_EVIDENCE'), true);
+  releases.splice(0).forEach((release) => release({ ok: true, rows: eligibleRows() }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(policy.pendingCount(), 0);
+  policy.evaluate({ ...params, latitude: 69 }, providers);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(reads, MAX_IN_FLIGHT_LOADS + 1);
+  releases[0]({ ok: false, reasonCode: 'READER_UNAVAILABLE' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(policy.pendingCount(), 0);
+});
+
+test('reader rejection and synchronous failure always release in-flight ownership', async () => {
+  const providers = [{ name: 'geoapify' }, { name: 'google' }];
+  for (const readMetrics of [() => { throw new Error('sync'); }, async () => { throw new Error('async'); },
+    () => new Promise((resolve) => setTimeout(() => resolve({ ok: false, reasonCode: 'READER_TIMEOUT' }), 5))]) {
+    const policy = createProviderPolicyShadow(policyEnv({ providerPolicyShadowEnabled: true }), {
+      now: () => NOW, logger: () => {}, readMetrics,
+    });
+    policy.evaluate(params, providers);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(policy.pendingCount(), 0);
+  }
+});
+
+test('pending ownership prevents eviction or clear from creating stale overlapping loads', async () => {
+  let reads = 0; let release;
+  const policy = createProviderPolicyShadow(policyEnv({ providerPolicyShadowEnabled: true }), {
+    now: () => NOW, logger: () => {}, readMetrics: () => {
+      reads += 1; return new Promise((resolve) => { release = resolve; });
+    },
+  });
+  const providers = [{ name: 'geoapify' }, { name: 'google' }];
+  policy.evaluate(params, providers);
+  await new Promise((resolve) => setImmediate(resolve));
+  policy.cache.clear();
+  policy.evaluate(params, providers);
+  assert.equal(reads, 1);
+  assert.equal(policy.pendingCount(), 1);
+  release({ ok: true, rows: eligibleRows() });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(policy.pendingCount(), 0);
+  assert.deepEqual(policy.evaluate(params, providers).proposedOrder, ['google', 'geoapify']);
+});
+
 test('reader uses fixed columns, bounded dates, one request and service-role only', async () => {
   let calls = 0; let captured;
   const reader = createMetricsReader(policyEnv(), { fetchImpl: async (url, options) => {
@@ -229,6 +325,24 @@ test('adaptive flag is parsed but remains inert', () => {
     providerPolicyAdaptiveEnabled: true }), { logger: () => {}, readMetrics: async () => ({ ok: true, rows: eligibleRows() }) });
   assert.equal(policy.adaptiveConfigured, true);
   assert.equal(policy.adaptiveEffective, false);
+});
+
+test('all shadow and adaptive flag combinations preserve static provider execution order', async () => {
+  for (const shadow of [false, true]) for (const adaptive of [false, true]) {
+    const calls = [];
+    const providers = ['geoapify', 'google'].map((name) => ({ name, sourceRole: 'LIVE', configured: true,
+      searchNearby: async () => { calls.push(name); return [place(name, name)]; } }));
+    const service = createNearbyService(policyEnv({ providerPolicyShadowEnabled: shadow,
+      providerPolicyAdaptiveEnabled: adaptive }), { providers,
+      providerPolicyOptions: { now: () => NOW, logger: () => {},
+        readMetrics: async () => ({ ok: true, rows: eligibleRows() }) } });
+    await service.searchNearby(params);
+    await new Promise((resolve) => setImmediate(resolve));
+    service.cache.clear();
+    await service.searchNearby(params);
+    assert.deepEqual(calls, ['geoapify', 'google', 'geoapify', 'google']);
+    assert.equal(service.providerPolicy.adaptiveEffective, false);
+  }
 });
 
 async function resolverRun(shadowEnabled) {
@@ -300,6 +414,40 @@ test('policy cannot alter trust, lineage, LDE-4 or LDE-5 state', async () => {
   assert.equal(response.items.every((item) => item.provider === 'geoapify'), true);
   assert.ok(metricsCalls > 0);
   assert.equal(providerPolicy.adaptiveEffective, undefined);
+});
+
+test('throwing or malformed shadow policy remains equivalent to static discovery', async () => {
+  async function run(providerPolicy) {
+    const calls = [];
+    const providers = ['geoapify', 'google'].map((name) => ({ name, sourceRole: 'LIVE', configured: true,
+      searchNearby: async () => { calls.push(name); return [place(name, name)]; } }));
+    const response = await createNearbyService(policyEnv(), { providers, providerPolicy }).searchNearby(params);
+    return { calls, response };
+  }
+  const baseline = await run({ evaluate: () => null });
+  const throwing = await run({ evaluate: () => { throw new Error('unsafe location-bearing error'); } });
+  const malformed = await run({ evaluate: () => Object.create(null, {
+    proposedOrder: { get() { throw new Error('hostile getter'); } },
+  }) });
+  const stable = (response) => ({ ...response,
+    items: response.items.map(({ fetchedAt: _fetchedAt, ...item }) => item) });
+  for (const candidate of [throwing, malformed]) {
+    assert.deepEqual(candidate.calls, baseline.calls);
+    assert.deepEqual(stable(candidate.response), stable(baseline.response));
+  }
+});
+
+test('shadow reader initialization failure remains equivalent to static discovery', async () => {
+  const calls = [];
+  const readerOptions = {};
+  Object.defineProperty(readerOptions, 'fetchImpl', { get() { throw new Error('reader initialization'); } });
+  const providers = [{ name: 'geoapify', sourceRole: 'LIVE', configured: true,
+    searchNearby: async () => { calls.push('geoapify'); return [place('geoapify', 'one')]; } }];
+  const response = await createNearbyService(policyEnv({ providerPolicyShadowEnabled: true }), {
+    providers, providerPolicyOptions: { readerOptions },
+  }).searchNearby(params);
+  assert.deepEqual(calls, ['geoapify']);
+  assert.equal(response.items.length, 1);
 });
 
 test('pure evaluation and snapshot lookup meet the local p95 target', () => {

@@ -5,6 +5,8 @@ const { evaluateProviderPolicy, LIVE_PROVIDERS, POLICY_VERSION, PROVIDER_FIELDS,
   validOperationalRegion } = require('./providerPolicy');
 
 const SNAPSHOT_MAX_KEYS = 500;
+// Analytics is optional. Keep its database/timer pressure strictly below nearby traffic concurrency.
+const MAX_IN_FLIGHT_LOADS = 16;
 const SNAPSHOT_TTL_MS = 12 * 60 * 1000;
 const FAILURE_TTL_MS = 60 * 1000;
 const READER_TIMEOUT_MS = 2000;
@@ -29,9 +31,33 @@ const EVIDENCE_CLASSES = new Set(['unavailable', 'invalid', 'sparse', 'stale', '
 const AGE_CLASSES = new Set(['unknown', 'invalid', 'fresh', 'recent', 'stale']);
 const OBSERVATION_CLASSES = new Set(['none', 'sparse', 'minimum', 'medium', 'high']);
 
-function policyKey(dimensions) {
-  return [dimensions.operationalRegion, dimensions.countryCode, dimensions.category,
-    dimensions.radiusBucket].join('|');
+function providerSignature(liveProviders) {
+  if (!Array.isArray(liveProviders) || !liveProviders.length
+    || liveProviders.some((provider) => !LIVE_PROVIDERS.includes(provider))
+    || new Set(liveProviders).size !== liveProviders.length) return null;
+  return JSON.stringify(liveProviders);
+}
+
+function policyKey(dimensions, liveProviders, policyVersion = POLICY_VERSION) {
+  const signature = providerSignature(liveProviders);
+  if (policyVersion !== POLICY_VERSION || !validDimensions(dimensions) || !signature) return null;
+  return JSON.stringify([policyVersion, dimensions.operationalRegion, dimensions.countryCode,
+    dimensions.category, dimensions.radiusBucket, liveProviders]);
+}
+
+function snapshotFor(key, staticOrder, decision) {
+  return Object.freeze({ key, policyVersion: POLICY_VERSION,
+    providerSignature: providerSignature(staticOrder), decision });
+}
+
+function validSnapshot(snapshot, key, staticOrder) {
+  try {
+    return Boolean(snapshot && snapshot.key === key && snapshot.policyVersion === POLICY_VERSION
+      && snapshot.providerSignature === providerSignature(staticOrder)
+      && snapshot.decision && Array.isArray(snapshot.decision.staticOrder)
+      && snapshot.decision.staticOrder.length === staticOrder.length
+      && snapshot.decision.staticOrder.every((provider, index) => provider === staticOrder[index]));
+  } catch { return false; }
 }
 
 function createPolicySnapshotCache(options = {}) {
@@ -141,16 +167,17 @@ function createProviderPolicyShadow(env, options = {}) {
 
   function load(key, dimensions, input) {
     if (pending.has(key)) return pending.get(key);
+    if (pending.size >= MAX_IN_FLIGHT_LOADS) return null;
     const promise = Promise.resolve().then(() => readMetrics(dimensions, now())).then((result) => {
       if (!result?.ok) {
         const reasonCode = REASON_CODES.has(result?.reasonCode) ? result.reasonCode : 'READER_UNAVAILABLE';
         diagnostics.emit({ event: reasonCode === 'METRICS_INVALID' ? 'metrics_invalid' : 'metrics_unavailable', reasonCode });
         const fallback = evaluateProviderPolicy({ ...input, rows: [], now: now() });
-        cache.set(key, fallback, FAILURE_TTL_MS);
+        cache.set(key, snapshotFor(key, input.staticOrder, fallback), FAILURE_TTL_MS);
         return fallback;
       }
       const decision = evaluateProviderPolicy({ ...input, rows: result.rows, now: now() });
-      cache.set(key, decision);
+      cache.set(key, snapshotFor(key, input.staticOrder, decision));
       diagnostics.emit({ event: eventForDecision(decision), reasonCode: decision.reasonCode,
         evidenceClass: decision.evidenceClass, decisionAgeClass: decision.decisionAgeClass });
       for (const item of decision.providerDecisions) diagnostics.emit({ event: 'provider_deprioritized',
@@ -179,12 +206,18 @@ function createProviderPolicyShadow(env, options = {}) {
         return evaluateProviderPolicy({ rows: [], liveProviders: staticOrder, staticOrder,
           category: params.category, now: now() });
       }
-      const key = policyKey(dimensions);
+      const key = policyKey(dimensions, staticOrder);
+      if (!key) {
+        diagnostics.emit({ event: 'static_policy_used', reasonCode: 'METRICS_INVALID' });
+        return evaluateProviderPolicy({ rows: [], liveProviders: staticOrder, staticOrder,
+          category: params.category, dimensions, now: now() });
+      }
       const cached = cache.get(key);
-      if (cached) {
-        diagnostics.emit({ event: 'shadow_policy_evaluated', reasonCode: cached.reasonCode,
-          evidenceClass: cached.evidenceClass, decisionAgeClass: cached.decisionAgeClass });
-        return cached;
+      if (validSnapshot(cached, key, staticOrder)) {
+        const { decision } = cached;
+        diagnostics.emit({ event: 'shadow_policy_evaluated', reasonCode: decision.reasonCode,
+          evidenceClass: decision.evidenceClass, decisionAgeClass: decision.decisionAgeClass });
+        return decision;
       }
       diagnostics.emit({ event: 'static_policy_used', reasonCode: 'CACHE_MISS' });
       void load(key, dimensions, { liveProviders: staticOrder, staticOrder, category: params.category, dimensions });
@@ -195,8 +228,8 @@ function createProviderPolicyShadow(env, options = {}) {
 }
 
 module.exports = {
-  FAILURE_TTL_MS, POLICY_EVENTS, READER_DAYS, READER_MAX_ROWS, READER_TIMEOUT_MS,
+  FAILURE_TTL_MS, MAX_IN_FLIGHT_LOADS, POLICY_EVENTS, READER_DAYS, READER_MAX_ROWS, READER_TIMEOUT_MS,
   SELECTED_COLUMNS, SNAPSHOT_MAX_KEYS, SNAPSHOT_TTL_MS,
   createMetricsReader, createPolicyDiagnostics, createPolicySnapshotCache,
-  createProviderPolicyShadow, policyKey, validDimensions,
+  createProviderPolicyShadow, policyKey, providerSignature, validDimensions, validSnapshot,
 };
