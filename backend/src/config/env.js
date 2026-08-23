@@ -49,6 +49,8 @@ function readEnv(source = process.env) {
   const operationalMetricsEnabled = mergedSource.DISCOVERY_OPERATIONAL_METRICS_ENABLED === 'true';
   const operationalMetricsPersistenceEnabled = operationalMetricsEnabled
     && mergedSource.DISCOVERY_OPERATIONAL_METRICS_PERSISTENCE_ENABLED === 'true';
+  const providerPolicyShadowEnabled = mergedSource.DISCOVERY_PROVIDER_POLICY_SHADOW_ENABLED === 'true';
+  const providerPolicyAdaptiveEnabled = mergedSource.DISCOVERY_PROVIDER_POLICY_ADAPTIVE_ENABLED === 'true';
   const allowedOrigins = (mergedSource.ALLOWED_ORIGINS || mergedSource.CORS_ORIGINS || '')
     .split(',').map((origin) => origin.trim()).filter(Boolean);
 
@@ -83,6 +85,8 @@ function readEnv(source = process.env) {
       demandRefreshEnabled,
       operationalMetricsEnabled,
       operationalMetricsPersistenceEnabled,
+      providerPolicyShadowEnabled,
+      providerPolicyAdaptiveEnabled,
       debugLocationLogging: mergedSource.DEBUG_LOCATION_LOGGING === 'true' && mergedSource.NODE_ENV !== 'production',
     },
     providers: {
