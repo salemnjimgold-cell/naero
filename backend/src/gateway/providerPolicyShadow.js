@@ -1,3 +1,4 @@
+const { types: utilTypes } = require('node:util');
 const { logger } = require('../observability/logger');
 const { getCategory } = require('./categories');
 const { metricDimensions } = require('./operationalMetrics');
@@ -31,32 +32,54 @@ const EVIDENCE_CLASSES = new Set(['unavailable', 'invalid', 'sparse', 'stale', '
 const AGE_CLASSES = new Set(['unknown', 'invalid', 'fresh', 'recent', 'stale']);
 const OBSERVATION_CLASSES = new Set(['none', 'sparse', 'minimum', 'medium', 'high']);
 
+function normalizeProviderOrder(input) {
+  try {
+    if (!Array.isArray(input) || utilTypes.isProxy(input)) return null;
+    const { length } = input;
+    if (!Number.isInteger(length) || length < 1 || length > LIVE_PROVIDERS.length) return null;
+    const normalized = [];
+    const seen = new Set();
+    for (let index = 0; index < length; index += 1) {
+      if (!Object.hasOwn(input, index)) return null;
+      const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null;
+      const provider = descriptor.value;
+      if (typeof provider !== 'string' || !LIVE_PROVIDERS.includes(provider) || seen.has(provider)) return null;
+      seen.add(provider);
+      normalized.push(provider);
+    }
+    return Object.freeze(normalized);
+  } catch { return null; }
+}
+
 function providerSignature(liveProviders) {
-  if (!Array.isArray(liveProviders) || !liveProviders.length
-    || liveProviders.some((provider) => !LIVE_PROVIDERS.includes(provider))
-    || new Set(liveProviders).size !== liveProviders.length) return null;
-  return JSON.stringify(liveProviders);
+  const normalized = normalizeProviderOrder(liveProviders);
+  return normalized ? JSON.stringify(normalized) : null;
 }
 
 function policyKey(dimensions, liveProviders, policyVersion = POLICY_VERSION) {
-  const signature = providerSignature(liveProviders);
-  if (policyVersion !== POLICY_VERSION || !validDimensions(dimensions) || !signature) return null;
+  const normalized = normalizeProviderOrder(liveProviders);
+  if (policyVersion !== POLICY_VERSION || !validDimensions(dimensions) || !normalized) return null;
   return JSON.stringify([policyVersion, dimensions.operationalRegion, dimensions.countryCode,
-    dimensions.category, dimensions.radiusBucket, liveProviders]);
+    dimensions.category, dimensions.radiusBucket, normalized]);
 }
 
 function snapshotFor(key, staticOrder, decision) {
+  const normalized = normalizeProviderOrder(staticOrder);
+  if (!normalized) return null;
   return Object.freeze({ key, policyVersion: POLICY_VERSION,
-    providerSignature: providerSignature(staticOrder), decision });
+    providerSignature: JSON.stringify(normalized), decision });
 }
 
 function validSnapshot(snapshot, key, staticOrder) {
   try {
+    const normalized = normalizeProviderOrder(staticOrder);
+    if (!normalized) return false;
     return Boolean(snapshot && snapshot.key === key && snapshot.policyVersion === POLICY_VERSION
-      && snapshot.providerSignature === providerSignature(staticOrder)
+      && snapshot.providerSignature === JSON.stringify(normalized)
       && snapshot.decision && Array.isArray(snapshot.decision.staticOrder)
-      && snapshot.decision.staticOrder.length === staticOrder.length
-      && snapshot.decision.staticOrder.every((provider, index) => provider === staticOrder[index]));
+      && snapshot.decision.staticOrder.length === normalized.length
+      && snapshot.decision.staticOrder.every((provider, index) => provider === normalized[index]));
   } catch { return false; }
 }
 
@@ -231,5 +254,5 @@ module.exports = {
   FAILURE_TTL_MS, MAX_IN_FLIGHT_LOADS, POLICY_EVENTS, READER_DAYS, READER_MAX_ROWS, READER_TIMEOUT_MS,
   SELECTED_COLUMNS, SNAPSHOT_MAX_KEYS, SNAPSHOT_TTL_MS,
   createMetricsReader, createPolicyDiagnostics, createPolicySnapshotCache,
-  createProviderPolicyShadow, policyKey, providerSignature, validDimensions, validSnapshot,
+  createProviderPolicyShadow, normalizeProviderOrder, policyKey, providerSignature, validDimensions, validSnapshot,
 };

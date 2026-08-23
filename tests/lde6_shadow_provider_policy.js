@@ -7,7 +7,7 @@ const { evaluateProviderPolicy, POLICY_VERSION, PROVIDER_FIELDS, SATURATED_COUNT
   validOperationalRegion } = require('../backend/src/gateway/providerPolicy');
 const { createMetricsReader, createPolicyDiagnostics, createPolicySnapshotCache,
   createProviderPolicyShadow, policyKey, providerSignature, SELECTED_COLUMNS, SNAPSHOT_MAX_KEYS,
-  MAX_IN_FLIGHT_LOADS } = require('../backend/src/gateway/providerPolicyShadow');
+  MAX_IN_FLIGHT_LOADS, normalizeProviderOrder } = require('../backend/src/gateway/providerPolicyShadow');
 
 const NOW = Date.parse('2026-08-23T12:00:00.000Z');
 const params = { latitude: 48.2, longitude: 16.3, radius: 5000, limit: 2,
@@ -179,6 +179,71 @@ test('cache identity isolates policy version, ordered provider set and every pol
   assert.equal(providerSignature(['geoapify', 'google']), '["geoapify","google"]');
   assert.notEqual(policyKey(DIMENSIONS, ['geoapify', 'google']),
     policyKey(DIMENSIONS, ['google', 'geoapify']));
+});
+
+test('canonical provider identity rejects sparse inherited accessor and hostile inputs without throwing', () => {
+  const sparseFirst = new Array(2); sparseFirst[1] = 'geoapify';
+  const sparseMiddle = ['geoapify', , 'osm'];
+  const sparseFinal = ['geoapify', 'google']; sparseFinal.length = 3;
+  const completelySparse = new Array(3);
+  let getterReads = 0;
+  const getterFirst = ['geoapify'];
+  Object.defineProperty(getterFirst, 0, { get() { getterReads += 1; throw new Error('hostile'); } });
+  const getterLater = ['geoapify', 'google'];
+  Object.defineProperty(getterLater, 1, { get() { getterReads += 1; throw new Error('hostile'); } });
+  const inherited = new Array(1);
+  const inheritedPrototype = Object.create(Array.prototype);
+  inheritedPrototype[0] = 'geoapify';
+  Object.setPrototypeOf(inherited, inheritedPrototype);
+  const proxy = new Proxy(['geoapify', 'google'], {
+    getOwnPropertyDescriptor(target, property) {
+      if (property === '0') target[1] = 'osm';
+      return Reflect.getOwnPropertyDescriptor(target, property);
+    },
+  });
+  const invalid = [sparseFirst, sparseMiddle, sparseFinal, completelySparse, getterFirst, getterLater,
+    inherited, ['geoapify', 'geoapify'], ['geoapify', 'hostile'], [], new Set(['geoapify']),
+    null, undefined, 'geoapify', 7, {}, proxy];
+  for (const value of invalid) {
+    assert.doesNotThrow(() => normalizeProviderOrder(value));
+    assert.equal(normalizeProviderOrder(value), null);
+    assert.doesNotThrow(() => providerSignature(value));
+    assert.equal(providerSignature(value), null);
+    assert.doesNotThrow(() => policyKey(DIMENSIONS, value));
+    assert.equal(policyKey(DIMENSIONS, value), null);
+  }
+  assert.equal(getterReads, 0);
+});
+
+test('canonical provider identity is a stable defensive dense copy', () => {
+  const caller = ['geoapify', 'google', 'osm'];
+  const normalized = normalizeProviderOrder(caller);
+  const signature = providerSignature(caller);
+  const key = policyKey(DIMENSIONS, caller);
+  assert.notEqual(normalized, caller);
+  assert.equal(Object.isFrozen(normalized), true);
+  assert.deepEqual(normalized, ['geoapify', 'google', 'osm']);
+  caller.reverse(); caller[0] = 'geoapify'; caller.length = 1;
+  assert.deepEqual(normalized, ['geoapify', 'google', 'osm']);
+  assert.equal(signature, '["geoapify","google","osm"]');
+  assert.equal(key, policyKey(DIMENSIONS, ['geoapify', 'google', 'osm']));
+  assert.notEqual(key, policyKey(DIMENSIONS, ['osm', 'google', 'geoapify']));
+});
+
+test('malformed provider identity cannot load analytics or enter policy state', async () => {
+  let reads = 0;
+  const policy = createProviderPolicyShadow(policyEnv({ providerPolicyShadowEnabled: true }), {
+    now: () => NOW, logger: () => {}, readMetrics: async () => {
+      reads += 1; return { ok: true, rows: eligibleRows() };
+    },
+  });
+  const sparse = new Array(2); sparse[1] = { name: 'geoapify' };
+  assert.doesNotThrow(() => policy.evaluate(params, sparse));
+  assert.equal(policy.evaluate(params, sparse).eligible, false);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(reads, 0);
+  assert.equal(policy.pendingCount(), 0);
+  assert.equal(policy.cache.size(), 0);
 });
 
 test('malformed cached identity fails closed and is never reused', async () => {
