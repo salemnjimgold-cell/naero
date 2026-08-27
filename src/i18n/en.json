@@ -220,5 +220,30 @@
     "ngo": "NGOs & Charities",
     "emergency": "Emergency Services",
     "jobSupport": "Job Support"
+  },
+  "truthfulHome": {
+    "welcome": "Welcome to Naero",
+    "welcomeNamed": "Welcome, {{name}}",
+    "guest": "Exploring as a guest",
+    "signedIn": "Your local starting point",
+    "location": "Location",
+    "locationMissing": "Not set",
+    "locationRequired": "Nearby discovery needs a resolved location.",
+    "manage": "Manage",
+    "manageLocation": "Manage location",
+    "discover": "Discover nearby places",
+    "discoverBody": "Search real places through Naero's nearby service.",
+    "ask": "Ask Naero AI",
+    "askBody": "Get help with your next question.",
+    "nearby": "Nearby places",
+    "noLocationTitle": "Set a location to discover nearby places",
+    "noLocationBody": "Use foreground location or choose a city that resolves to coordinates. You can continue without sharing location.",
+    "loading": "Loading nearby places",
+    "errorTitle": "Nearby places are temporarily unavailable",
+    "errorBody": "Naero will not substitute sample places. Open Discover to try again.",
+    "emptyTitle": "No nearby places found",
+    "emptyBody": "No real results are available for the current location and category.",
+    "openDiscover": "Open Discover",
+    "place": "Place"
   }
 }

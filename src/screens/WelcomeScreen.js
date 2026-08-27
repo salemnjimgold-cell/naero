@@ -97,7 +97,7 @@ export default function WelcomeScreen({ navigation }) {
     opacity: footerOpacity.value,
   }));
 
-  const handleAuthResult = useCallback((result, provider) => {
+  const handleAuthResult = useCallback((result) => {
     setLoading(null);
     if (result.error) {
       Alert.alert('Sign In', result.error);
@@ -105,7 +105,7 @@ export default function WelcomeScreen({ navigation }) {
     }
     if (result.session) {
       setAuth(result.session);
-      navigation.replace('Main');
+      navigation.replace('LocationPermission');
     }
   }, [setAuth, navigation]);
 
@@ -194,11 +194,7 @@ export default function WelcomeScreen({ navigation }) {
 
       <Animated.View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }, footerStyle]}>
         <Text style={styles.versionLabel}>Naero UX v2</Text>
-        <Text style={styles.terms}>
-          By continuing, you agree to our{' '}
-          <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-          <Text style={styles.termsLink}>Privacy Policy</Text>
-        </Text>
+        <Text style={styles.terms}>By continuing, you agree to the Naero Terms of Service and Privacy Policy.</Text>
       </Animated.View>
     </View>
   );

@@ -19,12 +19,6 @@ import PlaceAttributionLinks from '../components/PlaceAttributionLinks';
 import { mockCategories } from '../data/providers/mockCategories';
 const { categoriesMatch } = require('../services/nearbyClientCore');
 
-const TAB_ICONS = {
-  all: 'apps-outline',
-  places: 'location-outline',
-  services: 'briefcase-outline',
-};
-
 function getCategoryColor(categoryId) {
   if (!categoryId) return COLORS.textTertiary;
   const cat = mockCategories.find((c) => c.id === categoryId);
@@ -47,6 +41,8 @@ function ResultCard({ item, type, onPress }) {
       style={styles.card}
       onPress={() => onPress(item, type)}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name || 'Place'}, ${item.category || 'place'}`}
     >
       <View style={styles.cardRow}>
         <View style={[styles.cardIcon, { backgroundColor: color + '12', borderColor: color + '20' }]}>
@@ -90,15 +86,12 @@ export default function DiscoverScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const {
     placeService,
-    serviceService,
     userLocation,
   } = useApp();
 
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
   const [activeCategory, setActiveCategory] = useState('hospitals');
   const [allPlaces, setAllPlaces] = useState([]);
-  const [allServices, setAllServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nearbyError, setNearbyError] = useState(null);
   const [stale, setStale] = useState(false);
@@ -111,7 +104,6 @@ export default function DiscoverScreen({ navigation }) {
       setNearbyError(null);
       const latitude = userLocation?.latitude;
       const longitude = userLocation?.longitude;
-      const servicePromise = serviceService.getAll();
       if (typeof latitude !== 'number' || typeof longitude !== 'number') {
         setAllPlaces([]);
         setNearbyError({ code: 'LOCATION_REQUIRED', message: 'Choose a device or resolved manual location to find nearby places.' });
@@ -126,31 +118,18 @@ export default function DiscoverScreen({ navigation }) {
           setAttributions(placeRes.attribution || []);
         }
       }
-      const serviceRes = await servicePromise;
       if (!controller.signal.aborted) {
-        if (serviceRes.data) setAllServices(serviceRes.data);
         setLoading(false);
       }
     }
     loadData();
     return () => controller.abort();
-  }, [activeCategory, i18n.language, placeService, serviceService, userLocation?.latitude, userLocation?.longitude]);
+  }, [activeCategory, i18n.language, placeService, userLocation?.latitude, userLocation?.longitude]);
 
-  const combinedCategories = useMemo(() => {
-    if (activeTab === 'places') return mockCategories.filter((c) => c.domain === 'places');
-    if (activeTab === 'services') return mockCategories.filter((c) => c.domain === 'services');
-    return mockCategories;
-  }, [activeTab]);
+  const combinedCategories = useMemo(() => mockCategories.filter((c) => c.domain === 'places'), []);
 
   const filteredData = useMemo(() => {
-    let results = [];
-
-    if (activeTab === 'all' || activeTab === 'places') {
-      results = [...results, ...allPlaces.map((p) => ({ ...p, _type: 'place' }))];
-    }
-    if (activeTab === 'all' || activeTab === 'services') {
-      results = [...results, ...allServices.map((s) => ({ ...s, _type: 'service' }))];
-    }
+    let results = allPlaces.map((p) => ({ ...p, _type: 'place' }));
 
     if (activeCategory) {
       results = results.filter((r) => categoriesMatch(r.category, activeCategory));
@@ -167,22 +146,12 @@ export default function DiscoverScreen({ navigation }) {
     }
 
     return results;
-  }, [activeTab, activeCategory, search, allPlaces, allServices]);
+  }, [activeCategory, search, allPlaces]);
 
   const handleCardPress = useCallback((item, type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    if (type === 'place') {
-      navigation.navigate('PlaceDetail', { item });
-    } else {
-      navigation.navigate('ServiceDetail', { item });
-    }
+    navigation.navigate('PlaceDetail', { item });
   }, [navigation]);
-
-  const handleTabPress = useCallback((tab) => {
-    Haptics.selectionAsync().catch(() => {});
-    setActiveTab(tab);
-    setActiveCategory(tab === 'services' ? null : 'hospitals');
-  }, []);
 
   const handleCategoryPress = useCallback((catId) => {
     Haptics.selectionAsync().catch(() => {});
@@ -220,6 +189,8 @@ export default function DiscoverScreen({ navigation }) {
           <TouchableOpacity
             style={styles.profileBtn}
             onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
           >
             <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
@@ -235,31 +206,11 @@ export default function DiscoverScreen({ navigation }) {
             autoCorrect={false}
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearch('')}>
               <Ionicons name="close-circle" size={16} color={COLORS.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
-      </View>
-
-      <View style={styles.tabRow}>
-        {['all', 'places', 'services'].map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => handleTabPress(tab)}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={TAB_ICONS[tab]}
-              size={14}
-              color={activeTab === tab ? COLORS.white : COLORS.textSecondary}
-            />
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {t(`discover.${tab}`)}
-            </Text>
-          </TouchableOpacity>
-        ))}
       </View>
 
       <ScrollView
@@ -275,6 +226,9 @@ export default function DiscoverScreen({ navigation }) {
               style={[styles.categoryPill, isActive && { backgroundColor: cat.color, borderColor: cat.color }]}
               onPress={() => handleCategoryPress(cat.id)}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t(`categories.${cat.id}`)}
+              accessibilityState={{ selected: isActive }}
             >
               <Ionicons
                 name={cat.icon}

@@ -231,5 +231,8 @@
     "ngo": "ONG & Associations",
     "emergency": "Services d'urgence",
     "jobSupport": "Aide à l'emploi"
+  },
+  "truthfulHome": {
+    "welcome": "Bienvenue sur Naero", "welcomeNamed": "Bienvenue, {{name}}", "guest": "Exploration en tant qu'invité", "signedIn": "Votre point de départ local", "location": "Localisation", "locationMissing": "Non définie", "locationRequired": "La découverte à proximité nécessite une localisation résolue.", "manage": "Gérer", "manageLocation": "Gérer la localisation", "discover": "Découvrir les lieux à proximité", "discoverBody": "Recherchez des lieux réels via le service de proximité Naero.", "ask": "Demander à Naero AI", "askBody": "Obtenez de l'aide pour votre prochaine question.", "nearby": "Lieux à proximité", "noLocationTitle": "Définissez une localisation", "noLocationBody": "Utilisez la localisation au premier plan ou choisissez une ville résolue en coordonnées. Vous pouvez continuer sans partager votre position.", "loading": "Chargement des lieux à proximité", "errorTitle": "Lieux temporairement indisponibles", "errorBody": "Naero ne remplacera pas les résultats par des lieux fictifs. Ouvrez Découvrir pour réessayer.", "emptyTitle": "Aucun lieu trouvé", "emptyBody": "Aucun résultat réel n'est disponible pour la localisation et la catégorie actuelles.", "openDiscover": "Ouvrir Découvrir", "place": "Lieu"
   }
 }

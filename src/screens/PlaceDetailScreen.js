@@ -15,14 +15,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import * as Haptics from 'expo-haptics';
+import StateView from '../components/contextual/StateView';
+
+const { normalizePlaceDetailParams } = require('../domain/coreShell');
 
 const LOGO_PLACEHOLDER = require('../../assets/branding/naero-logo.png');
 
 export default function PlaceDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { item } = route.params;
   const { favorites, toggleFavorite } = useApp();
+  const item = normalizePlaceDetailParams(route?.params);
+
+  if (!item) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StateView
+          icon="alert-circle-outline"
+          tone="warning"
+          title="Place unavailable"
+          body="This place could not be opened safely. Return to Discover and choose it again."
+          primaryAction={{ label: "Back to Discover", onPress: () => navigation.navigate('Main', { screen: 'World' }) }}
+          secondaryAction={navigation.canGoBack() ? { label: "Go back", onPress: () => navigation.goBack() } : null}
+        />
+      </View>
+    );
+  }
   const isFavorite = favorites.includes(item.id);
 
   const imageSrc = item.image_url
@@ -40,8 +58,10 @@ export default function PlaceDetailScreen({ route, navigation }) {
 
   const handleDirections = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(item.address)}`);
+    const destination = item.address || (Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${item.latitude},${item.longitude}` : null);
+    if (destination) Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(destination)}`);
   };
+  const hasDirections = Boolean(item.address || (Number.isFinite(item.latitude) && Number.isFinite(item.longitude)));
 
   return (
     <View style={styles.container}>
@@ -143,21 +163,23 @@ export default function PlaceDetailScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      <View style={[styles.actionBar, { paddingBottom: insets.bottom + SPACING.xl }]}>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleCall}>
+      {(item.phone || hasDirections) && <View style={[styles.actionBar, { paddingBottom: insets.bottom + SPACING.xl }]}>
+        {item.phone && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('places.call')} style={styles.actionBtn} onPress={handleCall}>
           <LinearGradient colors={GRADIENTS.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
             <Ionicons name="call-outline" size={20} color={COLORS.white} />
             <Text style={styles.actionBtnText}>{t('places.call')}</Text>
           </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity
+        </TouchableOpacity>}
+        {hasDirections && <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={t('places.directions')}
           style={[styles.actionBtnSecondary]}
           onPress={handleDirections}
         >
           <Ionicons name="navigate-outline" size={20} color={COLORS.primary} />
           <Text style={styles.actionBtnTextSecondary}>{t('places.directions')}</Text>
-        </TouchableOpacity>
-      </View>
+        </TouchableOpacity>}
+      </View>}
     </View>
   );
 }

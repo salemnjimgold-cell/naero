@@ -83,17 +83,15 @@ export default function LocationPermissionScreen({ navigation }) {
 
           <Text style={styles.title}>Help us help you better</Text>
           <Text style={styles.description}>
-            Naero uses your location to show nearby services, jobs, housing,
-            transport, pharmacies, hospitals, safe places, and local community
-            help. Your location is only used to improve your experience.
+            Naero uses your foreground location to search for real nearby places.
+            You can also choose a city manually or continue without location.
           </Text>
 
           <View style={styles.benefitsList}>
             {[
               { icon: 'compass-outline', text: 'Find places near you' },
               { icon: 'medkit-outline', text: 'Nearby hospitals & pharmacies' },
-              { icon: 'bus-outline', text: 'Local transport routes' },
-              { icon: 'people-outline', text: 'Community help nearby' },
+              { icon: 'navigate-outline', text: 'Distance based on your current area' },
             ].map((item, idx) => (
               <View key={idx} style={styles.benefitRow}>
                 <View style={styles.benefitIcon}>
@@ -124,6 +122,8 @@ export default function LocationPermissionScreen({ navigation }) {
             onPress={handleAllow}
             disabled={locationLoading}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Allow foreground location"
           >
             <LinearGradient
               colors={GRADIENTS.primary}
@@ -147,6 +147,8 @@ export default function LocationPermissionScreen({ navigation }) {
             onPress={() => setShowManualCity(true)}
             disabled={locationLoading}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Choose a city manually"
           >
             <Text style={styles.manualText}>Choose a city manually</Text>
           </TouchableOpacity>
@@ -155,6 +157,8 @@ export default function LocationPermissionScreen({ navigation }) {
             style={styles.notNowBtn}
             onPress={handleNotNow}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Continue without location"
           >
             <Text style={styles.notNowText}>Not Now</Text>
           </TouchableOpacity>

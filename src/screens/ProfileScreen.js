@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Share,
-  Linking,
   Image,
   Alert,
 } from 'react-native';
@@ -26,19 +25,16 @@ const LOGO = require('../../assets/branding/naero-logo.png');
 const menuItems = [
   { id: 'notifications', icon: 'notifications-outline', color: COLORS.primary },
   { id: 'settings', icon: 'settings-outline', color: COLORS.textSecondary, screen: 'Settings' },
-  { id: 'saved', icon: 'heart-outline', color: COLORS.error },
-  { id: 'savedJobs', icon: 'briefcase-outline', color: COLORS.primary },
   { id: 'language', icon: 'language-outline', color: COLORS.purple },
   { id: 'about', icon: 'information-circle-outline', color: COLORS.info, screen: 'About' },
   { id: 'shareApp', icon: 'share-outline', color: COLORS.secondary },
-  { id: 'rateApp', icon: 'star-outline', color: COLORS.warning },
 ];
 
 export default function ProfileScreen({ navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const {
-    favorites, savedJobs, savedPlaces, userCity, hasLocationPermission,
+    favorites, userCity, hasLocationPermission,
     requestLocationPermission, refreshLocation, selectManualCity, disableLocation,
     clearLocationData, locationLoading, locationPreference, locationError,
     auth, isAuthenticated, unreadNotifications,
@@ -55,12 +51,6 @@ export default function ProfileScreen({ navigation }) {
         case 'notifications':
           navigation.navigate('Notifications');
           break;
-        case 'saved':
-          navigation.navigate('Discover');
-          break;
-        case 'savedJobs':
-          navigation.navigate('Jobs');
-          break;
         case 'language':
           setShowLanguageModal(true);
           break;
@@ -68,9 +58,6 @@ export default function ProfileScreen({ navigation }) {
           Share.share({
             message: 'Download Naero - Not a stranger anymore! https://naero.me',
           });
-          break;
-        case 'rateApp':
-          Linking.openURL('https://apps.apple.com/app/naero');
           break;
         case 'settings':
           navigation.navigate('Settings');
@@ -113,9 +100,6 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.profileInfo}>
             <View style={styles.avatarLarge}>
               <Image source={LOGO} style={{ width: 64, height: 64 }} resizeMode="contain" />
-              <TouchableOpacity style={styles.editBadge}>
-                <Ionicons name="pencil" size={12} color={COLORS.white} />
-              </TouchableOpacity>
             </View>
             <Text style={styles.profileName}>{isAuthenticated ? auth?.user?.displayName || 'User' : t('profile.guest')}</Text>
             <Text style={styles.profileEmail}>{isAuthenticated ? auth?.user?.email || '' : 'Guest'}</Text>
@@ -123,13 +107,8 @@ export default function ProfileScreen({ navigation }) {
 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>{savedPlaces.length + favorites.length}</Text>
+              <Text style={styles.statNumber}>{favorites.length}</Text>
               <Text style={styles.statLabel}>{t('profile.savedItems')}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statNumber}>{savedJobs.length}</Text>
-              <Text style={styles.statLabel}>{t('profile.savedJobs')}</Text>
             </View>
           </View>
         </LinearGradient>
