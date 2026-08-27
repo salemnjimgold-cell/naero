@@ -17,7 +17,7 @@ import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
 import Text from '../components/Text';
 import IconButton from '../components/IconButton';
 import { useApp } from '../context/AppContext';
-import { naeroAI, trackAIRequest, isAuthenticated as checkAuth } from '../services';
+import { naeroAI, trackAIRequest } from '../services';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 
@@ -88,7 +88,7 @@ export default function AIScreen({ navigation }) {
   const initChat = useCallback(async () => {
     setAiReady(true);
 
-    if (!checkAuth()) {
+    if (!isAuthenticated) {
       setMessages([{ id: 'welcome', role: 'assistant', content: 'Welcome to Naero AI! Sign in to access the full AI experience with knowledge retrieval and tool calling.' }]);
       return;
     }
@@ -104,7 +104,7 @@ export default function AIScreen({ navigation }) {
       conversationIdRef.current = conv.id;
     }
     setMessages([{ id: 'welcome', role: 'assistant', content: 'Hi! I\'m Naero AI. How can I help you with your journey?' }]);
-  }, []);
+  }, [isAuthenticated]);
 
   const scheduleScroll = useCallback(() => {
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
@@ -116,7 +116,7 @@ export default function AIScreen({ navigation }) {
   const handleSend = useCallback(
     async (text) => {
       const msg = text || input.trim();
-      if (!msg || isThinking || !aiReady) return;
+      if (!msg || isThinking || !aiReady || !isAuthenticated) return;
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       const userMsg = { id: Date.now().toString(), role: 'user', content: msg };
@@ -171,7 +171,7 @@ export default function AIScreen({ navigation }) {
       setIsThinking(false);
       scheduleScroll();
     },
-    [input, isThinking, aiReady, scheduleScroll, ragEnabled]
+    [input, isThinking, aiReady, isAuthenticated, scheduleScroll, ragEnabled]
   );
 
   const handleQuickAction = useCallback(
@@ -424,11 +424,15 @@ export default function AIScreen({ navigation }) {
             onSubmitEditing={() => handleSend()}
             blurOnSubmit
             selectionColor={COLORS.primary}
+            editable={isAuthenticated}
+            accessibilityLabel={isAuthenticated ? t('ai.placeholder') : 'Sign in to use Naero AI'}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || isThinking) && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, (!input.trim() || isThinking || !isAuthenticated) && styles.sendBtnDisabled]}
             onPress={() => handleSend()}
-            disabled={!input.trim() || isThinking}
+            disabled={!input.trim() || isThinking || !isAuthenticated}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
             activeOpacity={0.8}
           >
             <Ionicons name="arrow-up" size={20} color={COLORS.white} />

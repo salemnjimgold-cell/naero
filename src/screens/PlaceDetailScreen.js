@@ -15,33 +15,50 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import * as Haptics from 'expo-haptics';
+import StateView from '../components/contextual/StateView';
+
+const { buildDirectionsUrl, buildPhoneUrl, normalizePlaceDetailParams } = require('../domain/coreShell');
 
 const LOGO_PLACEHOLDER = require('../../assets/branding/naero-logo.png');
 
 export default function PlaceDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { item } = route.params;
   const { favorites, toggleFavorite } = useApp();
-  const isFavorite = favorites.includes(item.id);
+  const item = normalizePlaceDetailParams(route?.params);
 
-  const imageSrc = item.image_url
-    ? { uri: item.image_url }
-    : item.image
-      ? (typeof item.image === 'string' ? { uri: item.image } : item.image)
-      : null;
+  if (!item) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StateView
+          icon="alert-circle-outline"
+          tone="warning"
+          title={t('gate1.placeDetail.unavailableTitle')}
+          body={t('gate1.placeDetail.unavailableBody')}
+          primaryAction={{ label: t('gate1.placeDetail.discover'), onPress: () => navigation.navigate('Main', { screen: 'World' }) }}
+          secondaryAction={navigation.canGoBack() ? { label: t('common.back'), onPress: () => navigation.goBack() } : null}
+        />
+      </View>
+    );
+  }
+  const isFavorite = favorites.includes(item.id);
+  const canGoBack = navigation.canGoBack();
+
+  const imageSrc = item.image_url ? { uri: item.image_url } : null;
 
   const handleCall = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    if (item.phone) {
-      Linking.openURL(`tel:${item.phone.replace(/[^+\d]/g, '')}`);
-    }
+    const url = buildPhoneUrl(item);
+    if (url) Linking.openURL(url);
   };
 
   const handleDirections = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(item.address)}`);
+    const url = buildDirectionsUrl(item);
+    if (url) Linking.openURL(url);
   };
+  const hasCoordinates = Number.isFinite(item.latitude) && Number.isFinite(item.longitude);
+  const hasDirections = Boolean(item.address || hasCoordinates);
 
   return (
     <View style={styles.container}>
@@ -56,18 +73,23 @@ export default function PlaceDetailScreen({ route, navigation }) {
           >
             <View style={styles.imageContent}>
               <Image source={LOGO_PLACEHOLDER} style={{ width: 64, height: 64, opacity: 0.3 }} resizeMode="contain" />
-              <Text style={styles.imageHint}>No image available</Text>
+              <Text style={styles.imageHint}>{t('gate1.placeDetail.noImage')}</Text>
             </View>
           </LinearGradient>
         )}
         <View style={[styles.imageOverlay, { paddingTop: insets.top + SPACING.md }]}>
-          <TouchableOpacity
+          {canGoBack ? <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('gate1.placeDetail.back')}
             style={styles.circleBtn}
             onPress={() => navigation.canGoBack() && navigation.goBack()}
           >
             <Ionicons name="arrow-back" size={22} color={COLORS.white} />
-          </TouchableOpacity>
+          </TouchableOpacity> : <View style={styles.circleBtnPlaceholder} />}
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t(isFavorite ? 'gate1.placeDetail.removeFavorite' : 'gate1.placeDetail.addFavorite')}
+            accessibilityState={{ selected: isFavorite }}
             style={[styles.circleBtn, isFavorite && { backgroundColor: COLORS.error + '40' }]}
             onPress={() => toggleFavorite(item.id)}
           >
@@ -86,12 +108,12 @@ export default function PlaceDetailScreen({ route, navigation }) {
             />
           </View>
         )}
-        <View style={styles.priceBadge}>
+        {item.priceLevel && <View style={styles.priceBadge}>
           <Text style={styles.priceBadgeText}>{item.priceLevel}</Text>
-        </View>
+        </View>}
         {item.demo && (
           <View style={styles.demoBadge}>
-            <Text style={styles.demoBadgeText}>Demo data</Text>
+            <Text style={styles.demoBadgeText}>{t('gate1.placeDetail.demo')}</Text>
           </View>
         )}
       </View>
@@ -99,15 +121,15 @@ export default function PlaceDetailScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <View style={styles.contentSection}>
           <Text style={styles.title}>{item.name}</Text>
-          <View style={styles.ratingRow}>
+          {item.rating !== undefined && <View style={styles.ratingRow}>
             <Ionicons name="star" size={16} color={COLORS.warning} />
             <Text style={styles.ratingText}>{item.rating}</Text>
-            <Text style={styles.reviewText}>({item.reviews} {t('places.reviews')})</Text>
-          </View>
-          <View style={styles.addressRow}>
+            {item.reviews !== undefined && <Text style={styles.reviewText}>({item.reviews} {t('places.reviews')})</Text>}
+          </View>}
+          {item.address && <View style={styles.addressRow}>
             <Ionicons name="location-outline" size={16} color={COLORS.primary} />
             <Text style={styles.addressText}>{item.address}</Text>
-          </View>
+          </View>}
           <View style={styles.tagRow}>
             {item.tags?.map((tag) => (
               <View key={tag} style={styles.tag}>
@@ -117,10 +139,10 @@ export default function PlaceDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        <View style={styles.section}>
+        {item.description && <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('places.description')}</Text>
           <Text style={styles.description}>{item.description}</Text>
-        </View>
+        </View>}
 
         {item.hours && (
           <View style={styles.section}>
@@ -143,21 +165,23 @@ export default function PlaceDetailScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      <View style={[styles.actionBar, { paddingBottom: insets.bottom + SPACING.xl }]}>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleCall}>
+      {(item.phoneTarget || hasDirections) && <View style={[styles.actionBar, { paddingBottom: insets.bottom + SPACING.xl }]}>
+        {item.phoneTarget && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('places.call')} style={styles.actionBtn} onPress={handleCall}>
           <LinearGradient colors={GRADIENTS.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
             <Ionicons name="call-outline" size={20} color={COLORS.white} />
             <Text style={styles.actionBtnText}>{t('places.call')}</Text>
           </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity
+        </TouchableOpacity>}
+        {hasDirections && <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={t('places.directions')}
           style={[styles.actionBtnSecondary]}
           onPress={handleDirections}
         >
           <Ionicons name="navigate-outline" size={20} color={COLORS.primary} />
           <Text style={styles.actionBtnTextSecondary}>{t('places.directions')}</Text>
-        </TouchableOpacity>
-      </View>
+        </TouchableOpacity>}
+      </View>}
     </View>
   );
 }
@@ -200,12 +224,16 @@ const styles = StyleSheet.create({
     height: 60,
   },
   circleBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: RADIUS.full,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  circleBtnPlaceholder: {
+    width: 44,
+    height: 44,
   },
   priceBadge: {
     position: 'absolute',

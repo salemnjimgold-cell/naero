@@ -18,6 +18,7 @@ import { useApp } from '../context/AppContext';
 import { mockCategories } from '../data/providers/mockCategories';
 import { PlaceCard } from '../components/ListingCard';
 import { EmptyState } from '../components/EmptyState';
+const { normalizePlaceCollection } = require('../domain/coreShell');
 
 export default function ExploreScreen({ navigation }) {
   const { t } = useTranslation();
@@ -40,8 +41,10 @@ export default function ExploreScreen({ navigation }) {
     setLoading(false);
   }
 
+  const canonicalPlaces = useMemo(() => normalizePlaceCollection(allPlaces), [allPlaces]);
+
   const filteredPlaces = useMemo(() => {
-    let result = allPlaces;
+    let result = canonicalPlaces;
     if (activeCategory) {
       result = result.filter((p) => p.category === activeCategory);
     }
@@ -51,22 +54,22 @@ export default function ExploreScreen({ navigation }) {
         (p) =>
           p.name.toLowerCase().includes(q) ||
           (p.tags || []).some((t) => t.includes(q)) ||
-          p.description.toLowerCase().includes(q)
+          (p.description || '').toLowerCase().includes(q)
       );
     }
     return result;
-  }, [activeCategory, search, allPlaces]);
+  }, [activeCategory, search, canonicalPlaces]);
 
   const nearbyPlaces = useMemo(() => {
     if (!hasLocationPermission || !userLocation) return [];
-    const sorted = [...allPlaces].sort((a, b) => {
+    const sorted = [...canonicalPlaces].sort((a, b) => {
       if (!a.latitude || !b.latitude) return 0;
       const dA = Math.abs(a.latitude - userLocation.latitude) + Math.abs(a.longitude - userLocation.longitude);
       const dB = Math.abs(b.latitude - userLocation.latitude) + Math.abs(b.longitude - userLocation.longitude);
       return dA - dB;
     });
     return sorted.slice(0, 4);
-  }, [hasLocationPermission, userLocation, allPlaces]);
+  }, [hasLocationPermission, userLocation, canonicalPlaces]);
 
   const handleCategoryPress = useCallback((cat) => {
     setActiveCategory(activeCategory === cat.id ? null : cat.id);
