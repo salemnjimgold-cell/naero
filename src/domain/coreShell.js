@@ -78,10 +78,13 @@ function boundedString(value, maxLength) {
 }
 
 function normalizePhone(value) {
-  const display = boundedString(value, 80);
-  if (!display) return null;
-  const target = display.replace(/[^+\d]/g, '');
-  if (!target || target === '+' || !/^\+?\d{3,20}$/.test(target)) return null;
+  if (typeof value !== 'string' || value.length > 80) return null;
+  if (/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/u.test(value)) return null;
+  const display = value.replace(/^ +| +$/g, '');
+  if (!display || !/^\+?[0-9 ().-]+$/.test(display)) return null;
+  const target = display.replace(/[ ().-]/g, '');
+  const digits = target.startsWith('+') ? target.slice(1) : target;
+  if (!/^\d{3,20}$/.test(digits)) return null;
   return { display, target };
 }
 

@@ -34,4 +34,42 @@ check('all PlaceDetail callers use one item contract', () => {
   const hits = ['HomeScreen.js', 'DiscoverScreen.js', 'ExploreScreen.js'].map((file) => fs.readFileSync(path.join(root, 'src/screens', file), 'utf8'));
   assert(hits.every((source) => source.includes("navigate('PlaceDetail', { item")));
 });
+
+const validPhones = new Map([
+  ['123', 'tel:123'], ['123456', 'tel:123456'], ['+4312345678', 'tel:+4312345678'],
+  ['+43 1 234 5678', 'tel:+4312345678'], ['+43 (1) 234-5678', 'tel:+4312345678'],
+  ['01 234 5678', 'tel:012345678'], ['(01) 234-5678', 'tel:012345678'],
+  ['+36 30 123 4567', 'tel:+36301234567'], ['+216 71 123 456', 'tel:+21671123456'],
+  ['12345678901234567890', 'tel:12345678901234567890'],
+]);
+for (const [phone, expected] of validPhones) {
+  check(`valid phone ${phone}`, () => {
+    const item = normalizePlaceDetailParams({ item: { ...valid, phone } });
+    assert(item.phoneTarget, 'Call must be exposed');
+    assert.strictEqual(buildPhoneUrl(item), expected);
+  });
+}
+
+const invalidPhones = [
+  '', ' ', '+', '++43123', '43+123', '+43+123', 'abc', 'abc123', '123abc', 'call-me-123',
+  'http://example.com/123', 'https://example.com/123', 'tel:123', 'mailto:123', '123@456',
+  '123/456', '123\\456', '123?456', '123#456', '123&456', '123=456', '123%456',
+  '123:456', '123;456', '12\n34', '12\r34', '12\t34', `12${String.fromCharCode(0)}34`,
+  '12\u200b34', '123😀456', {}, [], 123, true, null, undefined, '12',
+  '123456789012345678901', '9'.repeat(81),
+];
+for (const phone of invalidPhones) {
+  check('invalid phone fails closed', () => {
+    const item = normalizePlaceDetailParams({ item: { ...valid, phone } });
+    assert.strictEqual(item.phone, undefined);
+    assert.strictEqual(item.phoneTarget, undefined);
+    assert.strictEqual(buildPhoneUrl(item), null);
+  });
+}
+check('hostile phone getter remains fail closed', () => {
+  const item = Object.defineProperty({ ...valid }, 'phone', { get() { throw new Error('hostile'); } });
+  const normalized = normalizePlaceDetailParams({ item });
+  assert.strictEqual(normalized.phoneTarget, undefined);
+  assert.strictEqual(buildPhoneUrl(normalized), null);
+});
 console.log(`Milestone 7 hostile PlaceDetail: ${passed} tests passed.`);
