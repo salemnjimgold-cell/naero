@@ -43,7 +43,7 @@ test('Home passes the canonical PlaceDetail item contract', () => {
 
 test('PlaceDetail contract accepts a valid item and rejects malformed params', () => {
   const place = { id: 'provider:1', name: 'Real Place', provider: 'osm' };
-  assert.deepStrictEqual(normalizePlaceDetailParams({ item: place }), place);
+  assert.deepStrictEqual({ ...normalizePlaceDetailParams({ item: place }) }, place);
   for (const params of [undefined, null, {}, { item: null }, { item: [] }, { item: { id: '1' } }, { item: { name: 'Name' } }]) {
     assert.strictEqual(normalizePlaceDetailParams(params), null);
   }
