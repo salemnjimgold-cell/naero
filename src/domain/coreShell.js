@@ -2,11 +2,12 @@ function hasCoordinates(location) {
   return Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude);
 }
 
+const MAX_PLACE_COLLECTION_ITEMS = 200;
+const MAX_PLACE_TAGS = 12;
+
 function getHomeState({ auth, userCity, userLocation, nearbyPlaces, loading, error }) {
   const located = hasCoordinates(userLocation);
-  const places = Array.isArray(nearbyPlaces)
-    ? normalizePlaceCollection(nearbyPlaces).slice(0, 3)
-    : [];
+  const places = normalizePlaceCollection(nearbyPlaces).slice(0, 3);
   return {
     displayName: auth?.mode === 'authenticated' ? (auth.user?.displayName || null) : null,
     isGuest: auth?.mode !== 'authenticated',
@@ -19,8 +20,26 @@ function getHomeState({ auth, userCity, userLocation, nearbyPlaces, loading, err
 }
 
 function normalizePlaceCollection(items) {
-  if (!Array.isArray(items)) return [];
-  return items.map((item) => normalizePlaceDetailParams({ item })).filter(Boolean);
+  try {
+    if (!Array.isArray(items)) return [];
+  } catch {
+    return [];
+  }
+
+  const lengthEntry = safeOwnEntry(items, 'length');
+  if (!lengthEntry.ok || !lengthEntry.present
+      || !Number.isSafeInteger(lengthEntry.value) || lengthEntry.value < 0) return [];
+
+  const normalized = [];
+  const length = Math.min(lengthEntry.value, MAX_PLACE_COLLECTION_ITEMS);
+  for (let index = 0; index < length; index += 1) {
+    const entry = safeOwnEntry(items, String(index));
+    if (!entry.ok) return [];
+    if (!entry.present) continue;
+    const item = normalizePlaceDetailParams({ item: entry.value });
+    if (item) normalized.push(item);
+  }
+  return normalized;
 }
 
 function normalizePlaceDetailParams(params) {
@@ -60,11 +79,8 @@ function normalizePlaceDetailParams(params) {
     || boundedString(safeReadOwn(item, 'image'), 2000);
   if (imageUrl && /^https:\/\//i.test(imageUrl)) normalized.image_url = imageUrl;
 
-  const tags = safeReadOwn(item, 'tags');
-  if (Array.isArray(tags)) {
-    const safeTags = tags.slice(0, 12).map((tag) => boundedString(tag, 80)).filter(Boolean);
-    if (safeTags.length) normalized.tags = safeTags;
-  }
+  const tags = normalizeTags(safeReadOwn(item, 'tags'));
+  if (tags) normalized.tags = tags;
   for (const field of ['rating', 'reviews']) {
     const value = safeReadOwn(item, field);
     if (Number.isFinite(value) && value >= 0) normalized[field] = value;
@@ -91,6 +107,40 @@ function safeReadOwn(value, key) {
   } catch {
     return undefined;
   }
+}
+
+function safeOwnEntry(value, key) {
+  try {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+      return { ok: true, present: false, value: undefined };
+    }
+    return { ok: true, present: true, value: value[key] };
+  } catch {
+    return { ok: false, present: false, value: undefined };
+  }
+}
+
+function normalizeTags(tags) {
+  try {
+    if (!Array.isArray(tags)) return null;
+  } catch {
+    return null;
+  }
+
+  const lengthEntry = safeOwnEntry(tags, 'length');
+  if (!lengthEntry.ok || !lengthEntry.present
+      || !Number.isSafeInteger(lengthEntry.value) || lengthEntry.value < 0) return null;
+
+  const normalized = [];
+  const length = Math.min(lengthEntry.value, MAX_PLACE_TAGS);
+  for (let index = 0; index < length; index += 1) {
+    const entry = safeOwnEntry(tags, String(index));
+    if (!entry.ok) return null;
+    if (!entry.present) continue;
+    const tag = boundedString(entry.value, 80);
+    if (tag) normalized.push(tag);
+  }
+  return normalized.length ? Object.freeze(normalized) : null;
 }
 
 function boundedString(value, maxLength) {
