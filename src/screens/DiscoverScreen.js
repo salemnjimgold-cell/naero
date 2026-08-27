@@ -18,6 +18,7 @@ import { useApp } from '../context/AppContext';
 import PlaceAttributionLinks from '../components/PlaceAttributionLinks';
 import { mockCategories } from '../data/providers/mockCategories';
 const { categoriesMatch } = require('../services/nearbyClientCore');
+const { normalizePlaceCollection } = require('../domain/coreShell');
 
 function getCategoryColor(categoryId) {
   if (!categoryId) return COLORS.textTertiary;
@@ -128,8 +129,10 @@ export default function DiscoverScreen({ navigation }) {
 
   const combinedCategories = useMemo(() => mockCategories.filter((c) => c.domain === 'places'), []);
 
+  const canonicalPlaces = useMemo(() => normalizePlaceCollection(allPlaces), [allPlaces]);
+
   const filteredData = useMemo(() => {
-    let results = allPlaces.map((p) => ({ ...p, _type: 'place' }));
+    let results = canonicalPlaces;
 
     if (activeCategory) {
       results = results.filter((r) => categoriesMatch(r.category, activeCategory));
@@ -146,7 +149,7 @@ export default function DiscoverScreen({ navigation }) {
     }
 
     return results;
-  }, [activeCategory, search, allPlaces]);
+  }, [activeCategory, search, canonicalPlaces]);
 
   const handleCardPress = useCallback((item, type) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -251,13 +254,13 @@ export default function DiscoverScreen({ navigation }) {
     <View style={styles.container}>
       <FlatList
         data={filteredData}
-        keyExtractor={(item) => `${item._type || 'unknown'}-${item.id || Math.random()}`}
+        keyExtractor={(item) => `place-${item.id}`}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         renderItem={({ item }) => (
           <ResultCard
             item={item}
-            type={item._type}
+            type="place"
             onPress={handleCardPress}
           />
         )}

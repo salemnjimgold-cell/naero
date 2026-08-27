@@ -21,7 +21,7 @@ test('Home contains no fictional identity, city, progress, places, or people', (
 });
 
 test('Home derives real named and nearby state from supplied application state', () => {
-  const state = getHomeState({ auth: { mode: 'authenticated', user: { displayName: 'Real User' } }, userCity: 'Vienna', userLocation: { latitude: 1, longitude: 2 }, nearbyPlaces: [{ id: 'osm:1', name: 'Real Hospital', category: 'hospital' }] });
+  const state = getHomeState({ auth: { mode: 'authenticated', user: { displayName: 'Real User' } }, userCity: 'Vienna', userLocation: { latitude: 1, longitude: 2 }, nearbyPlaces: [{ id: 'osm:1', name: 'Real Hospital', provider: 'osm', category: 'hospital' }] });
   assert.equal(state.displayName, 'Real User');
   assert.equal(state.locationLabel, 'Vienna');
   assert.equal(state.places.length, 1);

@@ -5,7 +5,7 @@ function hasCoordinates(location) {
 function getHomeState({ auth, userCity, userLocation, nearbyPlaces, loading, error }) {
   const located = hasCoordinates(userLocation);
   const places = Array.isArray(nearbyPlaces)
-    ? nearbyPlaces.filter((place) => place && place.id && place.name).slice(0, 3)
+    ? normalizePlaceCollection(nearbyPlaces).slice(0, 3)
     : [];
   return {
     displayName: auth?.mode === 'authenticated' ? (auth.user?.displayName || null) : null,
@@ -16,6 +16,11 @@ function getHomeState({ auth, userCity, userLocation, nearbyPlaces, loading, err
     loading: Boolean(loading && located),
     error: error ? String(error) : null,
   };
+}
+
+function normalizePlaceCollection(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => normalizePlaceDetailParams({ item })).filter(Boolean);
 }
 
 function normalizePlaceDetailParams(params) {
@@ -118,4 +123,4 @@ function buildDirectionsUrl(item) {
   return destination ? `https://maps.google.com/?q=${encodeURIComponent(destination)}` : null;
 }
 
-module.exports = { buildDirectionsUrl, buildPhoneUrl, getHomeState, hasCoordinates, normalizePlaceDetailParams };
+module.exports = { buildDirectionsUrl, buildPhoneUrl, getHomeState, hasCoordinates, normalizePlaceCollection, normalizePlaceDetailParams };
