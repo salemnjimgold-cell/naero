@@ -42,6 +42,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
     );
   }
   const isFavorite = favorites.includes(item.id);
+  const canGoBack = navigation.canGoBack();
 
   const imageSrc = item.image_url ? { uri: item.image_url } : null;
 
@@ -77,13 +78,18 @@ export default function PlaceDetailScreen({ route, navigation }) {
           </LinearGradient>
         )}
         <View style={[styles.imageOverlay, { paddingTop: insets.top + SPACING.md }]}>
-          <TouchableOpacity
+          {canGoBack ? <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('gate1.placeDetail.back')}
             style={styles.circleBtn}
             onPress={() => navigation.canGoBack() && navigation.goBack()}
           >
             <Ionicons name="arrow-back" size={22} color={COLORS.white} />
-          </TouchableOpacity>
+          </TouchableOpacity> : <View style={styles.circleBtnPlaceholder} />}
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t(isFavorite ? 'gate1.placeDetail.removeFavorite' : 'gate1.placeDetail.addFavorite')}
+            accessibilityState={{ selected: isFavorite }}
             style={[styles.circleBtn, isFavorite && { backgroundColor: COLORS.error + '40' }]}
             onPress={() => toggleFavorite(item.id)}
           >
@@ -218,12 +224,16 @@ const styles = StyleSheet.create({
     height: 60,
   },
   circleBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: RADIUS.full,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  circleBtnPlaceholder: {
+    width: 44,
+    height: 44,
   },
   priceBadge: {
     position: 'absolute',
