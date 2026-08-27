@@ -35,7 +35,7 @@
     "test:design:trust-states": "node tests/milestone5c_3b_trust_states.js",
     "test:ux:3c": "node tests/milestone5c_3c_navigation_onboarding.js",
     "test:ux:3d": "node tests/milestone5c_3d_discover.js",
-    "test:m7:gate1": "node tests/milestone7_gate1_truthful_shell.js",
+    "test:m7:gate1": "node tests/milestone7_gate1_truthful_shell.js && node tests/milestone7_gate1_place_detail_hostile.js && node tests/milestone7_gate1_localization.js",
     "typecheck:location": "tsc -p jsconfig.location.json",
     "typecheck:nearby": "tsc -p jsconfig.nearby.json",
     "backend:dev": "powershell -ExecutionPolicy Bypass -File scripts/backend-dev.ps1",

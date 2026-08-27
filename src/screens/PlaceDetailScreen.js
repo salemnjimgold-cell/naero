@@ -17,7 +17,7 @@ import { useApp } from '../context/AppContext';
 import * as Haptics from 'expo-haptics';
 import StateView from '../components/contextual/StateView';
 
-const { normalizePlaceDetailParams } = require('../domain/coreShell');
+const { buildDirectionsUrl, buildPhoneUrl, normalizePlaceDetailParams } = require('../domain/coreShell');
 
 const LOGO_PLACEHOLDER = require('../../assets/branding/naero-logo.png');
 
@@ -33,35 +33,31 @@ export default function PlaceDetailScreen({ route, navigation }) {
         <StateView
           icon="alert-circle-outline"
           tone="warning"
-          title="Place unavailable"
-          body="This place could not be opened safely. Return to Discover and choose it again."
-          primaryAction={{ label: "Back to Discover", onPress: () => navigation.navigate('Main', { screen: 'World' }) }}
-          secondaryAction={navigation.canGoBack() ? { label: "Go back", onPress: () => navigation.goBack() } : null}
+          title={t('gate1.placeDetail.unavailableTitle')}
+          body={t('gate1.placeDetail.unavailableBody')}
+          primaryAction={{ label: t('gate1.placeDetail.discover'), onPress: () => navigation.navigate('Main', { screen: 'World' }) }}
+          secondaryAction={navigation.canGoBack() ? { label: t('common.back'), onPress: () => navigation.goBack() } : null}
         />
       </View>
     );
   }
   const isFavorite = favorites.includes(item.id);
 
-  const imageSrc = item.image_url
-    ? { uri: item.image_url }
-    : item.image
-      ? (typeof item.image === 'string' ? { uri: item.image } : item.image)
-      : null;
+  const imageSrc = item.image_url ? { uri: item.image_url } : null;
 
   const handleCall = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    if (item.phone) {
-      Linking.openURL(`tel:${item.phone.replace(/[^+\d]/g, '')}`);
-    }
+    const url = buildPhoneUrl(item);
+    if (url) Linking.openURL(url);
   };
 
   const handleDirections = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const destination = item.address || (Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${item.latitude},${item.longitude}` : null);
-    if (destination) Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(destination)}`);
+    const url = buildDirectionsUrl(item);
+    if (url) Linking.openURL(url);
   };
-  const hasDirections = Boolean(item.address || (Number.isFinite(item.latitude) && Number.isFinite(item.longitude)));
+  const hasCoordinates = Number.isFinite(item.latitude) && Number.isFinite(item.longitude);
+  const hasDirections = Boolean(item.address || hasCoordinates);
 
   return (
     <View style={styles.container}>
@@ -76,7 +72,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
           >
             <View style={styles.imageContent}>
               <Image source={LOGO_PLACEHOLDER} style={{ width: 64, height: 64, opacity: 0.3 }} resizeMode="contain" />
-              <Text style={styles.imageHint}>No image available</Text>
+              <Text style={styles.imageHint}>{t('gate1.placeDetail.noImage')}</Text>
             </View>
           </LinearGradient>
         )}
@@ -106,12 +102,12 @@ export default function PlaceDetailScreen({ route, navigation }) {
             />
           </View>
         )}
-        <View style={styles.priceBadge}>
+        {item.priceLevel && <View style={styles.priceBadge}>
           <Text style={styles.priceBadgeText}>{item.priceLevel}</Text>
-        </View>
+        </View>}
         {item.demo && (
           <View style={styles.demoBadge}>
-            <Text style={styles.demoBadgeText}>Demo data</Text>
+            <Text style={styles.demoBadgeText}>{t('gate1.placeDetail.demo')}</Text>
           </View>
         )}
       </View>
@@ -119,15 +115,15 @@ export default function PlaceDetailScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <View style={styles.contentSection}>
           <Text style={styles.title}>{item.name}</Text>
-          <View style={styles.ratingRow}>
+          {item.rating !== undefined && <View style={styles.ratingRow}>
             <Ionicons name="star" size={16} color={COLORS.warning} />
             <Text style={styles.ratingText}>{item.rating}</Text>
-            <Text style={styles.reviewText}>({item.reviews} {t('places.reviews')})</Text>
-          </View>
-          <View style={styles.addressRow}>
+            {item.reviews !== undefined && <Text style={styles.reviewText}>({item.reviews} {t('places.reviews')})</Text>}
+          </View>}
+          {item.address && <View style={styles.addressRow}>
             <Ionicons name="location-outline" size={16} color={COLORS.primary} />
             <Text style={styles.addressText}>{item.address}</Text>
-          </View>
+          </View>}
           <View style={styles.tagRow}>
             {item.tags?.map((tag) => (
               <View key={tag} style={styles.tag}>
@@ -137,10 +133,10 @@ export default function PlaceDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        <View style={styles.section}>
+        {item.description && <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('places.description')}</Text>
           <Text style={styles.description}>{item.description}</Text>
-        </View>
+        </View>}
 
         {item.hours && (
           <View style={styles.section}>
@@ -163,8 +159,8 @@ export default function PlaceDetailScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      {(item.phone || hasDirections) && <View style={[styles.actionBar, { paddingBottom: insets.bottom + SPACING.xl }]}>
-        {item.phone && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('places.call')} style={styles.actionBtn} onPress={handleCall}>
+      {(item.phoneTarget || hasDirections) && <View style={[styles.actionBar, { paddingBottom: insets.bottom + SPACING.xl }]}>
+        {item.phoneTarget && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('places.call')} style={styles.actionBtn} onPress={handleCall}>
           <LinearGradient colors={GRADIENTS.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
             <Ionicons name="call-outline" size={20} color={COLORS.white} />
             <Text style={styles.actionBtnText}>{t('places.call')}</Text>

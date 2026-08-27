@@ -232,6 +232,15 @@
     "emergency": "Sürgősségi szolgáltatások",
     "jobSupport": "Álláskeresési támogatás"
   },
+  "gate1": {
+    "preview": { "title": "{{feature}} — Előnézet", "discover": "Valós közeli helyek felfedezése" },
+    "community": { "title": "Közösség", "body": "A közösségi bejegyzések és interakciók még nem kapcsolódnak ellenőrzött éles szolgáltatáshoz. Mintaaktivitást nem jelenítünk meg valósnak." },
+    "jobs": { "title": "Állások", "body": "Jelenlegi álláshirdetések nem érhetők el ellenőrzött éles forrásból." },
+    "services": { "title": "Támogató szolgáltatások", "body": "Ellenőrzött éles címtár még nem érhető el. Valós közeli helyekhez használd a Felfedezést." },
+    "safety": { "title": "Biztonsági információk", "body": "Aktuális helyi biztonsági információ még nem érhető el ellenőrzött éles forrásból. Vészhelyzetben fordulj a helyi hivatalos segélyszolgálathoz." },
+    "placeDetail": { "unavailableTitle": "A hely nem érhető el", "unavailableBody": "Ezt a helyet nem lehetett biztonságosan megnyitni. Térj vissza a Felfedezéshez, és válaszd ki újra.", "discover": "Vissza a Felfedezéshez", "noImage": "Nincs elérhető kép", "demo": "Demóadat" },
+    "location": { "badge": "Helyhozzáférés", "title": "Segíts, hogy jobban segíthessünk", "description": "A Naero az előtérben használt helyzeteddel keres valós közeli helyeket. Kézzel is választhatsz várost, vagy helyadat nélkül folytathatod.", "findPlaces": "Közeli helyek keresése", "healthcare": "Közeli kórházak és gyógyszertárak", "distance": "Távolság a jelenlegi környéked alapján", "privacy": "A Naero ezen az eszközön tárolja a helyválasztásodat. A GPS használata nem kötelező, és a választást bármikor törölheted.", "allowLabel": "Előtérbeli helyhozzáférés engedélyezése", "enabling": "Engedélyezés…", "allow": "Helyhozzáférés engedélyezése", "manual": "Város kiválasztása kézzel", "continueWithout": "Folytatás helyadat nélkül", "notNow": "Most nem", "settings": "Ezt bármikor módosíthatod a Beállításokban" }
+  },
   "truthfulHome": {
     "welcome": "Üdvözlünk a Naeróban", "welcomeNamed": "Üdv, {{name}}", "guest": "Vendégként böngészel", "signedIn": "A helyi kiindulópontod", "location": "Hely", "locationMissing": "Nincs beállítva", "locationRequired": "A közeli kereséshez feloldott hely szükséges.", "manage": "Kezelés", "manageLocation": "Hely kezelése", "discover": "Közeli helyek felfedezése", "discoverBody": "Keress valós helyeket a Naero közeli szolgáltatásával.", "ask": "Kérdezd a Naero AI-t", "askBody": "Kérj segítséget a következő kérdésedhez.", "nearby": "Közeli helyek", "noLocationTitle": "Állíts be helyet a közeli kereséshez", "noLocationBody": "Használd az előtérbeli helymeghatározást, vagy válassz koordinátákra feloldható várost. Helymegosztás nélkül is folytathatod.", "loading": "Közeli helyek betöltése", "errorTitle": "A közeli helyek átmenetileg nem érhetők el", "errorBody": "A Naero nem helyettesíti az eredményeket mintahelyekkel. Próbáld újra a Felfedezésben.", "emptyTitle": "Nem található közeli hely", "emptyBody": "Nincs valós eredmény a jelenlegi helyhez és kategóriához.", "openDiscover": "Felfedezés megnyitása", "place": "Hely"
   }

@@ -13,9 +13,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, GRADIENTS, FONTS, SPACING, RADIUS } from '../theme';
 import { useApp } from '../context/AppContext';
 import { ManualCityModal } from '../components/ManualCityModal';
+import { useTranslation } from 'react-i18next';
 
 const LOGO = require('../../assets/branding/naero-logo.png');
 export default function LocationPermissionScreen({ navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const {
     requestLocationPermission,
@@ -78,20 +80,17 @@ export default function LocationPermissionScreen({ navigation }) {
             <View style={styles.iconGlow}>
               <Image source={LOGO} style={styles.logo} resizeMode="contain" />
             </View>
-            <Text style={styles.badge}>Location Access</Text>
+            <Text style={styles.badge}>{t('gate1.location.badge')}</Text>
           </View>
 
-          <Text style={styles.title}>Help us help you better</Text>
-          <Text style={styles.description}>
-            Naero uses your foreground location to search for real nearby places.
-            You can also choose a city manually or continue without location.
-          </Text>
+          <Text style={styles.title}>{t('gate1.location.title')}</Text>
+          <Text style={styles.description}>{t('gate1.location.description')}</Text>
 
           <View style={styles.benefitsList}>
             {[
-              { icon: 'compass-outline', text: 'Find places near you' },
-              { icon: 'medkit-outline', text: 'Nearby hospitals & pharmacies' },
-              { icon: 'navigate-outline', text: 'Distance based on your current area' },
+              { icon: 'compass-outline', text: t('gate1.location.findPlaces') },
+              { icon: 'medkit-outline', text: t('gate1.location.healthcare') },
+              { icon: 'navigate-outline', text: t('gate1.location.distance') },
             ].map((item, idx) => (
               <View key={idx} style={styles.benefitRow}>
                 <View style={styles.benefitIcon}>
@@ -105,8 +104,7 @@ export default function LocationPermissionScreen({ navigation }) {
           <View style={styles.privacyNote}>
             <Ionicons name="shield-checkmark" size={16} color={COLORS.secondary} />
             <Text style={styles.privacyText}>
-              Naero stores your location choice on this device. GPS is optional,
-              and you can clear it at any time.
+              {t('gate1.location.privacy')}
             </Text>
           </View>
 
@@ -123,7 +121,7 @@ export default function LocationPermissionScreen({ navigation }) {
             disabled={locationLoading}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Allow foreground location"
+            accessibilityLabel={t('gate1.location.allowLabel')}
           >
             <LinearGradient
               colors={GRADIENTS.primary}
@@ -132,11 +130,11 @@ export default function LocationPermissionScreen({ navigation }) {
               style={styles.allowGradient}
             >
               {locationLoading ? (
-                <Text style={styles.allowText}>Enabling...</Text>
+                <Text style={styles.allowText}>{t('gate1.location.enabling')}</Text>
               ) : (
                 <>
                   <Ionicons name="location" size={20} color={COLORS.white} />
-                  <Text style={styles.allowText}>Allow Location</Text>
+                  <Text style={styles.allowText}>{t('gate1.location.allow')}</Text>
                 </>
               )}
             </LinearGradient>
@@ -148,9 +146,9 @@ export default function LocationPermissionScreen({ navigation }) {
             disabled={locationLoading}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Choose a city manually"
+            accessibilityLabel={t('gate1.location.manual')}
           >
-            <Text style={styles.manualText}>Choose a city manually</Text>
+            <Text style={styles.manualText}>{t('gate1.location.manual')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -158,15 +156,15 @@ export default function LocationPermissionScreen({ navigation }) {
             onPress={handleNotNow}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Continue without location"
+            accessibilityLabel={t('gate1.location.continueWithout')}
           >
-            <Text style={styles.notNowText}>Not Now</Text>
+            <Text style={styles.notNowText}>{t('gate1.location.notNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            You can change this anytime in Settings
+            {t('gate1.location.settings')}
           </Text>
         </View>
       </LinearGradient>

@@ -42,20 +42,20 @@ test('Home passes the canonical PlaceDetail item contract', () => {
 });
 
 test('PlaceDetail contract accepts a valid item and rejects malformed params', () => {
-  const place = { id: 'provider:1', name: 'Real Place' };
-  assert.strictEqual(normalizePlaceDetailParams({ item: place }), place);
+  const place = { id: 'provider:1', name: 'Real Place', provider: 'osm' };
+  assert.deepStrictEqual(normalizePlaceDetailParams({ item: place }), place);
   for (const params of [undefined, null, {}, { item: null }, { item: [] }, { item: { id: '1' } }, { item: { name: 'Name' } }]) {
     assert.strictEqual(normalizePlaceDetailParams(params), null);
   }
-  assert(read('src/screens/PlaceDetailScreen.js').includes('This place could not be opened safely'));
+  assert(read('src/screens/PlaceDetailScreen.js').includes("t('gate1.placeDetail.unavailableBody')"));
 });
 
 test('Guest success proceeds through the optional location explanation', () => {
   const welcome = read('src/screens/WelcomeScreen.js');
   assert(welcome.includes("navigation.replace('LocationPermission')"));
   const location = read('src/screens/LocationPermissionScreen.js');
-  assert(location.includes('Continue without location'));
-  assert(location.includes('Choose a city manually'));
+  assert(location.includes("t('gate1.location.continueWithout')"));
+  assert(location.includes("t('gate1.location.manual')"));
   const ai = read('src/screens/AIScreen.js');
   assert(ai.includes('if (!isAuthenticated)'));
   assert(ai.includes('editable={isAuthenticated}'));
@@ -75,7 +75,7 @@ test('Mock-backed primary surfaces are explicitly preview-labelled', () => {
     assert(!source.includes('../data/providers/mock'));
   }
   const preview = read('src/components/PreviewStateScreen.js');
-  assert(preview.includes('— Preview'));
+  assert(preview.includes("t('gate1.preview.title'"));
 });
 
 test('Touched primary controls are accessible and RTL remains supported', () => {
@@ -84,7 +84,7 @@ test('Touched primary controls are accessible and RTL remains supported', () => 
   assert(home.includes("i18n.language === 'ar'"));
   assert(home.includes("writingDirection: 'rtl'"));
   const location = read('src/screens/LocationPermissionScreen.js');
-  assert(location.includes('accessibilityLabel="Continue without location"'));
+  assert(location.includes("accessibilityLabel={t('gate1.location.continueWithout')}"));
 });
 
 test('No visible primary action is a haptics-only handler', () => {
