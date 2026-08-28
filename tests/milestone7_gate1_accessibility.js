@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const i18next = require('i18next');
 
 const root = path.resolve(__dirname, '..');
 const screen = fs.readFileSync(path.join(root, 'src/screens/PlaceDetailScreen.js'), 'utf8');
@@ -42,4 +43,21 @@ test('Accessibility keys are non-empty and equivalent across all locales', () =>
   assert.notEqual(locales[1][1].gate1.placeDetail.addFavorite, locales[0][1].gate1.placeDetail.addFavorite);
 });
 
-console.log(`Milestone 7 Gate 1 accessibility: ${passed}/4 passed.`);
+test('PlaceDetail action display and accessibility labels use resolved localized text', () => {
+  assert(screen.includes("accessibilityLabel={t('places.call')}"));
+  assert(screen.includes("accessibilityLabel={t('places.directions')}"));
+  assert(screen.includes("<Text style={styles.actionBtnText}>{t('places.call')}</Text>"));
+  assert(screen.includes("<Text style={styles.actionBtnTextSecondary}>{t('places.directions')}</Text>"));
+  for (const [locale, resource] of locales) {
+    const instance = i18next.createInstance();
+    instance.init({ lng: locale, fallbackLng: false, initImmediate: false, resources: { [locale]: { translation: resource } } });
+    for (const key of ['places.call', 'places.directions']) {
+      const value = instance.t(key);
+      assert.equal(typeof value, 'string', `${locale}.${key} must resolve to text`);
+      assert(value.trim(), `${locale}.${key} blank`);
+      assert.notEqual(value, key, `${locale}.${key} leaked its raw key`);
+    }
+  }
+});
+
+console.log(`Milestone 7 Gate 1 accessibility: ${passed}/5 passed.`);

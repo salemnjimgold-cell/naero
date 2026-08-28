@@ -5,9 +5,21 @@
   },
   "nav": {
     "home": "Accueil",
+    "world": "Monde",
+    "people": "Personnes",
     "discover": "Découvrir",
     "community": "Communauté",
     "profile": "Profil"
+  },
+  "discover": {
+    "title": "Découvrir",
+    "subtitle": "Trouvez ce dont vous avez besoin à proximité",
+    "searchPlaceholder": "Rechercher des lieux, des services...",
+    "all": "Tout",
+    "places": "Lieux",
+    "services": "Services",
+    "noResults": "Aucun résultat trouvé",
+    "nearbyTitle": "À proximité"
   },
   "home": {
     "greeting": "Bonjour",
@@ -33,9 +45,6 @@
     "noResults": "Aucun lieu trouvé",
     "distance": "km"
   },
-  "services": {
-    "title": "Services",
-    "subtitle": "Aide abordable quand vous en avez besoin",
   "places": {
     "reviews": "avis",
     "description": "Description",
@@ -44,6 +53,9 @@
     "call": "Appeler",
     "directions": "Itinéraire"
   },
+  "services": {
+    "title": "Services",
+    "subtitle": "Aide abordable quand vous en avez besoin",
   "categories": {
       "legal": "Aide juridique",
       "translation": "Traduction",

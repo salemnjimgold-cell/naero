@@ -5,9 +5,21 @@
   },
   "nav": {
     "home": "Főoldal",
+    "world": "Világ",
+    "people": "Emberek",
     "discover": "Felfedezés",
     "community": "Közösség",
     "profile": "Profil"
+  },
+  "discover": {
+    "title": "Felfedezés",
+    "subtitle": "Találd meg, amire szükséged van a közelben",
+    "searchPlaceholder": "Helyek és szolgáltatások keresése...",
+    "all": "Összes",
+    "places": "Helyek",
+    "services": "Szolgáltatások",
+    "noResults": "Nincs találat",
+    "nearbyTitle": "Közelben"
   },
   "home": {
     "greeting": "Üdvözöllek",
@@ -33,9 +45,6 @@
     "noResults": "Nincs találat",
     "distance": "km-re"
   },
-  "services": {
-    "title": "Szolgáltatások",
-    "subtitle": "Megfizethető segítség, amikor szükséged van rá",
   "places": {
     "reviews": "vélemény",
     "description": "Leírás",
@@ -44,6 +53,9 @@
     "call": "Hívás",
     "directions": "Útvonal"
   },
+  "services": {
+    "title": "Szolgáltatások",
+    "subtitle": "Megfizethető segítség, amikor szükséged van rá",
   "categories": {
       "legal": "Jogi segítségnyújtás",
       "translation": "Fordítás",
