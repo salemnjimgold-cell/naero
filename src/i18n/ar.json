@@ -5,9 +5,17 @@
   },
   "nav": {
     "home": "الرئيسية",
+    "world": "العالم",
+    "people": "الناس",
     "discover": "اكتشف",
     "community": "المجتمع",
     "profile": "الملف الشخصي"
+  },
+  "discover": {
+    "title": "اكتشف",
+    "subtitle": "اعثر على ما تحتاجه بالقرب منك",
+    "searchPlaceholder": "ابحث عن أماكن، خدمات...",
+    "noResults": "لم يتم العثور على نتائج"
   },
   "home": {
     "greeting": "مرحباً",
@@ -33,9 +41,6 @@
     "noResults": "لم يتم العثور على أماكن",
     "distance": "كم"
   },
-  "services": {
-    "title": "خدمات",
-    "subtitle": "مساعدة ميسرة عندما تحتاجها",
   "places": {
     "reviews": "تقييم",
     "description": "الوصف",
@@ -44,6 +49,9 @@
     "call": "اتصال",
     "directions": "الاتجاهات"
   },
+  "services": {
+    "title": "خدمات",
+    "subtitle": "مساعدة ميسرة عندما تحتاجها",
   "categories": {
       "legal": "مساعدة قانونية",
       "translation": "ترجمة",

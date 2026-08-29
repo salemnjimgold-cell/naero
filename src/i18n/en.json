@@ -32,9 +32,6 @@
     "noResults": "No places found",
     "distance": "km away"
   },
-  "services": {
-    "title": "Services",
-    "subtitle": "Affordable help when you need it",
   "places": {
     "reviews": "reviews",
     "description": "Description",
@@ -43,6 +40,9 @@
     "call": "Call",
     "directions": "Directions"
   },
+  "services": {
+    "title": "Services",
+    "subtitle": "Affordable help when you need it",
   "categories": {
       "legal": "Legal Aid",
       "translation": "Translation",
