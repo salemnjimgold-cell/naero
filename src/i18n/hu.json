@@ -15,11 +15,7 @@
     "title": "Felfedezés",
     "subtitle": "Találd meg, amire szükséged van a közelben",
     "searchPlaceholder": "Helyek és szolgáltatások keresése...",
-    "all": "Összes",
-    "places": "Helyek",
-    "services": "Szolgáltatások",
-    "noResults": "Nincs találat",
-    "nearbyTitle": "Közelben"
+    "noResults": "Nincs találat"
   },
   "home": {
     "greeting": "Üdvözöllek",

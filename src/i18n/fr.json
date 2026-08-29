@@ -15,11 +15,7 @@
     "title": "Découvrir",
     "subtitle": "Trouvez ce dont vous avez besoin à proximité",
     "searchPlaceholder": "Rechercher des lieux, des services...",
-    "all": "Tout",
-    "places": "Lieux",
-    "services": "Services",
-    "noResults": "Aucun résultat trouvé",
-    "nearbyTitle": "À proximité"
+    "noResults": "Aucun résultat trouvé"
   },
   "home": {
     "greeting": "Bonjour",

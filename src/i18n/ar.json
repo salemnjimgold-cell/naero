@@ -15,11 +15,7 @@
     "title": "اكتشف",
     "subtitle": "اعثر على ما تحتاجه بالقرب منك",
     "searchPlaceholder": "ابحث عن أماكن، خدمات...",
-    "all": "الكل",
-    "places": "أماكن",
-    "services": "خدمات",
-    "noResults": "لم يتم العثور على نتائج",
-    "nearbyTitle": "القريبة"
+    "noResults": "لم يتم العثور على نتائج"
   },
   "home": {
     "greeting": "مرحباً",
