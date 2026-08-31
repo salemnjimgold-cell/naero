@@ -16,8 +16,8 @@ function test(name, fn) {
   console.log(`PASS ${name}`);
 }
 
-function parse(file) {
-  return babel.parseSync(read(file), {
+function parseSource(source) {
+  return babel.parseSync(source, {
     babelrc: false,
     configFile: false,
     parserOpts: { sourceType: 'module', plugins: ['jsx'] },
@@ -58,14 +58,14 @@ function componentNames(value) {
   return [...new Set(names)];
 }
 
-function tabRoutes(ast, navigatorName) {
+function navigatorRoutes(ast, navigatorName, navigatorObject) {
   const fn = functionNode(ast, navigatorName);
   assert(fn, `missing ${navigatorName}`);
   const routes = [];
   walk(fn, (node) => {
     if (node.type !== 'JSXOpeningElement') return;
     const tag = node.name;
-    if (tag.type !== 'JSXMemberExpression' || tag.object.name !== 'Tab' || tag.property.name !== 'Screen') return;
+    if (tag.type !== 'JSXMemberExpression' || tag.object.name !== navigatorObject || tag.property.name !== 'Screen') return;
     routes.push({
       name: literalAttribute(jsxAttribute(node, 'name')),
       components: componentNames(jsxAttribute(node, 'component')),
@@ -74,26 +74,56 @@ function tabRoutes(ast, navigatorName) {
   return routes;
 }
 
-test('production navigation graph keeps legacy discovery merged into World', () => {
-  const navigator = parse('src/navigation/AppNavigator.js');
-  const legacy = tabRoutes(navigator, 'TabNavigator');
-  const contextual = tabRoutes(navigator, 'ContextualTabNavigator');
+function allScreenRegistrations(ast) {
+  const routes = [];
+  walk(ast, (node) => {
+    if (node.type !== 'JSXOpeningElement') return;
+    const tag = node.name;
+    if (tag.type !== 'JSXMemberExpression' || tag.property.name !== 'Screen') return;
+    routes.push({
+      navigator: tag.object.name,
+      name: literalAttribute(jsxAttribute(node, 'name')),
+      components: componentNames(jsxAttribute(node, 'component')),
+    });
+  });
+  return routes;
+}
+
+function validateNavigationContract(source, flagDefaults = FLAG_DEFAULTS) {
+  const navigator = parseSource(source);
+  const legacy = navigatorRoutes(navigator, 'TabNavigator', 'Tab');
+  const contextual = navigatorRoutes(navigator, 'ContextualTabNavigator', 'Tab');
+  const stack = navigatorRoutes(navigator, 'AppNavigator', 'Stack');
   assert.deepStrictEqual(legacy, [
     { name: 'Home', components: ['HomeScreen'] },
     { name: 'World', components: ['DiscoverScreen'] },
     { name: 'People', components: ['CommunityScreen'] },
   ]);
-  assert.deepStrictEqual(contextual.map((route) => route.name), ['Home', 'Discover', 'Plan', 'MyNaero']);
-  assert(contextual.find((route) => route.name === 'Discover').components.includes('DiscoverScreen'));
-  assert(![...legacy, ...contextual].some((route) => route.name === 'Explore' || route.components.includes('ExploreScreen')));
-  assert.strictEqual(FLAG_DEFAULTS.newNavigation, false);
+  assert.deepStrictEqual(contextual, [
+    { name: 'Home', components: ['ContextualHomeBridgeScreen'] },
+    { name: 'Discover', components: ['ContextualDiscoverScreen', 'DiscoverScreen'] },
+    { name: 'Plan', components: ['PlanShellScreen'] },
+    { name: 'MyNaero', components: ['MyNaeroShellScreen'] },
+  ]);
+  const placeDetail = stack.filter((route) => route.name === 'PlaceDetail');
+  assert.deepStrictEqual(placeDetail, [{ name: 'PlaceDetail', components: ['PlaceDetailScreen'] }]);
+  const registrations = allScreenRegistrations(navigator);
+  assert(!registrations.some((route) => route.name === 'Explore' || route.components.includes('ExploreScreen')), 'legacy Explore became reachable without authorization');
+  assert.strictEqual(flagDefaults.newNavigation, false);
+  return { legacy, contextual, stack, registrations };
+}
+
+const navigatorSource = read('src/navigation/AppNavigator.js');
+
+test('production navigation graph keeps legacy discovery merged into World', () => {
+  validateNavigationContract(navigatorSource);
 });
 
 test('reachable production PlaceDetail caller set is exactly Home and Discover', () => {
-  const navigator = parse('src/navigation/AppNavigator.js');
+  const graph = validateNavigationContract(navigatorSource);
   const reachableComponents = new Set([
-    ...tabRoutes(navigator, 'TabNavigator'),
-    ...tabRoutes(navigator, 'ContextualTabNavigator'),
+    ...graph.legacy,
+    ...graph.contextual,
   ].flatMap((route) => route.components));
   const screens = fs.readdirSync(path.join(root, 'src/screens')).filter((file) => file.endsWith('.js'));
   const sourceCallers = screens.filter((file) => /navigate\(\s*['"]PlaceDetail['"]/.test(read(`src/screens/${file}`))).sort();
@@ -101,7 +131,54 @@ test('reachable production PlaceDetail caller set is exactly Home and Discover',
   assert.deepStrictEqual(sourceCallers, ['DiscoverScreen.js', 'ExploreScreen.js', 'HomeScreen.js']);
   assert.deepStrictEqual(reachableCallers, ['DiscoverScreen.js', 'HomeScreen.js']);
   assert(!reachableComponents.has('ExploreScreen'), 'legacy Explore became reachable without authorization');
+  assert(graph.stack.some((route) => route.name === 'PlaceDetail' && route.components.length === 1 && route.components[0] === 'PlaceDetailScreen'));
 });
+
+function mutationDetected(name, mutateSource, flagDefaults = FLAG_DEFAULTS) {
+  test(`hostile navigation mutation detected: ${name}`, () => {
+    assert.throws(() => validateNavigationContract(mutateSource(navigatorSource), flagDefaults));
+  });
+}
+
+const remove = (fragment) => (source) => {
+  assert(source.includes(fragment), `mutation fixture missing: ${fragment}`);
+  return source.replace(fragment, '');
+};
+const replace = (before, after) => (source) => {
+  assert(source.includes(before), `mutation fixture missing: ${before}`);
+  return source.replace(before, after);
+};
+
+mutationDetected('legacy Home removal', remove('<Tab.Screen\n        name="Home"\n        component={HomeScreen}\n        options={{ tabBarLabel: t(\'nav.home\') }}\n        listeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}\n      />'));
+mutationDetected('legacy World removal', remove('<Tab.Screen\n        name="World"\n        component={DiscoverScreen}\n        options={{ tabBarLabel: t(\'nav.world\') }}\n        listeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}\n      />'));
+mutationDetected('legacy People removal', remove('<Tab.Screen\n        name="People"\n        component={CommunityScreen}\n        options={{ tabBarLabel: t(\'nav.people\') }}\n        listeners={{ tabPress: () => Haptics.selectionAsync().catch(() => {}) }}\n      />'));
+mutationDetected('legacy Home misbind', replace('name="Home"\n        component={HomeScreen}', 'name="Home"\n        component={CommunityScreen}'));
+mutationDetected('legacy World misbind', replace('name="World"\n        component={DiscoverScreen}', 'name="World"\n        component={HomeScreen}'));
+mutationDetected('legacy People misbind', replace('name="People"\n        component={CommunityScreen}', 'name="People"\n        component={HomeScreen}'));
+
+mutationDetected('contextual Home removal', remove('<Tab.Screen name="Home" component={ContextualHomeBridgeScreen} options={{ tabBarLabel: t(\'nav.home\') }} />'));
+mutationDetected('contextual Discover removal', remove('<Tab.Screen name="Discover" component={featureFlags.newDiscover ? ContextualDiscoverScreen : DiscoverScreen} options={{ tabBarLabel: t(\'compass3c.nav.discover\') }} />'));
+mutationDetected('contextual Plan removal', remove('<Tab.Screen name="Plan" component={PlanShellScreen} options={{ tabBarLabel: t(\'compass3c.nav.plan\') }} />'));
+mutationDetected('contextual My Naero removal', remove('<Tab.Screen name="MyNaero" component={MyNaeroShellScreen} options={{ tabBarLabel: t(\'compass3c.nav.myNaero\') }} />'));
+mutationDetected('contextual Home misbind', replace('component={ContextualHomeBridgeScreen}', 'component={PlanShellScreen}'));
+mutationDetected('contextual Discover misbind', replace('component={featureFlags.newDiscover ? ContextualDiscoverScreen : DiscoverScreen}', 'component={PlanShellScreen}'));
+mutationDetected('contextual Plan misbind', replace('component={PlanShellScreen}', 'component={MyNaeroShellScreen}'));
+mutationDetected('contextual My Naero misbind', replace('component={MyNaeroShellScreen}', 'component={PlanShellScreen}'));
+
+const beforeLegacyClose = '    </Tab.Navigator>\n  );\n}\n\nfunction ContextualTabNavigator';
+mutationDetected('Explore legacy fourth tab', replace(beforeLegacyClose, '      <Tab.Screen name="Explore" component={ExploreScreen} />\n' + beforeLegacyClose));
+mutationDetected('ExploreScreen renamed legacy tab', replace(beforeLegacyClose, '      <Tab.Screen name="Places" component={ExploreScreen} />\n' + beforeLegacyClose));
+const beforeContextualClose = '  </Tab.Navigator><Pressable';
+mutationDetected('Explore contextual tab', replace(beforeContextualClose, '    <Tab.Screen name="Explore" component={ExploreScreen} />\n' + beforeContextualClose));
+mutationDetected('ExploreScreen renamed contextual tab', replace(beforeContextualClose, '    <Tab.Screen name="Places" component={ExploreScreen} />\n' + beforeContextualClose));
+const beforeStackClose = '      </Stack.Navigator>';
+mutationDetected('Explore stack route', replace(beforeStackClose, '        <Stack.Screen name="Explore" component={ExploreScreen} />\n' + beforeStackClose));
+mutationDetected('ExploreScreen renamed stack route', replace(beforeStackClose, '        <Stack.Screen name="Places" component={ExploreScreen} />\n' + beforeStackClose));
+
+mutationDetected('PlaceDetail removal', (source) => source.replace(/\s*<Stack\.Screen\s+name="PlaceDetail"[\s\S]*?\/>/, ''));
+mutationDetected('PlaceDetail misbind', replace('name="PlaceDetail"\n          component={PlaceDetailScreen}', 'name="PlaceDetail"\n          component={ServiceDetailScreen}'));
+mutationDetected('PlaceDetail duplicate', replace(beforeStackClose, '        <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />\n' + beforeStackClose));
+mutationDetected('newNavigation default change', (source) => source, { ...FLAG_DEFAULTS, newNavigation: true });
 
 test('Home actionable records satisfy PlaceDetail', () => {
   const places = getHomeState({ auth: { mode: 'guest' }, userLocation: { latitude: 1, longitude: 1 }, nearbyPlaces: [valid] }).places;
