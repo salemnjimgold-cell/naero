@@ -141,7 +141,8 @@ function placeDetailCalls(file, source) {
   const ast = parseSource(source);
   const calls = [];
   walk(ast, (node) => {
-    if (node.type !== 'CallExpression' || node.callee?.type !== 'MemberExpression') return;
+    if (!['CallExpression', 'OptionalCallExpression'].includes(node.type)
+      || !['MemberExpression', 'OptionalMemberExpression'].includes(node.callee?.type)) return;
     const property = node.callee.computed ? node.callee.property?.value : node.callee.property?.name;
     if (property !== 'navigate' || node.arguments[0]?.type !== 'StringLiteral' || node.arguments[0].value !== 'PlaceDetail') return;
     calls.push({ file, line: node.loc.start.line, column: node.loc.start.column + 1 });
@@ -232,6 +233,9 @@ function callerMutationDetected(name, mutateSources) {
 }
 
 const extraCaller = "export function hostileCaller(navigation, item) { navigation.navigate('PlaceDetail', { item }); }\n";
+const optionalObjectCaller = "export function hostileCaller(navigation, item) { navigation?.navigate('PlaceDetail', { item }); }\n";
+const optionalMethodCaller = "export function hostileCaller(navigation, item) { navigation.navigate?.('PlaceDetail', { item }); }\n";
+const combinedOptionalCaller = "export function hostileCaller(navigation, item) { navigation?.navigate?.('PlaceDetail', { item }); }\n";
 callerMutationDetected('out-of-screens component caller', (sources) => sources.set('src/components/HostileCaller.js', extraCaller));
 callerMutationDetected('out-of-screens navigation caller', (sources) => sources.set('src/navigation/HostileCaller.js', extraCaller));
 callerMutationDetected('other production directory caller', (sources) => sources.set('src/services/HostileCaller.js', extraCaller));
@@ -246,6 +250,36 @@ for (const [name, file] of [
 callerMutationDetected('second Home caller', (sources) => sources.set('src/screens/HomeScreen.js', sources.get('src/screens/HomeScreen.js') + extraCaller));
 callerMutationDetected('second Discover caller', (sources) => sources.set('src/screens/DiscoverScreen.js', sources.get('src/screens/DiscoverScreen.js') + extraCaller));
 callerMutationDetected('unknown canonical caller', (sources) => sources.set('src/components/CanonicalHostileCaller.js', "export function hostileCaller(navigation, canonicalPlace) { navigation.navigate('PlaceDetail', { item: canonicalPlace }); }\n"));
+callerMutationDetected('optional object caller', (sources) => sources.set('src/components/OptionalObjectCaller.js', optionalObjectCaller));
+callerMutationDetected('optional method caller', (sources) => sources.set('src/components/OptionalMethodCaller.js', optionalMethodCaller));
+callerMutationDetected('combined optional caller', (sources) => sources.set('src/components/CombinedOptionalCaller.js', combinedOptionalCaller));
+callerMutationDetected('deep optional object caller', (sources) => sources.set('src/features/deep/nested/OptionalObjectCaller.js', optionalObjectCaller));
+callerMutationDetected('deep optional method caller', (sources) => sources.set('src/features/deep/nested/OptionalMethodCaller.js', optionalMethodCaller));
+callerMutationDetected('optional navigation directory caller', (sources) => sources.set('src/navigation/OptionalCaller.js', optionalObjectCaller));
+callerMutationDetected('optional services directory caller', (sources) => sources.set('src/services/OptionalCaller.js', optionalMethodCaller));
+callerMutationDetected('unknown canonical optional caller', (sources) => sources.set('src/components/CanonicalOptionalCaller.js', "export function hostileCaller(navigation, canonicalPlace) { navigation?.navigate('PlaceDetail', { item: canonicalPlace }); }\n"));
+callerMutationDetected('second optional Home caller', (sources) => sources.set('src/screens/HomeScreen.js', sources.get('src/screens/HomeScreen.js') + optionalObjectCaller));
+callerMutationDetected('second optional Discover caller', (sources) => sources.set('src/screens/DiscoverScreen.js', sources.get('src/screens/DiscoverScreen.js') + optionalMethodCaller));
+callerMutationDetected('second optional Explore caller', (sources) => sources.set('src/screens/ExploreScreen.js', sources.get('src/screens/ExploreScreen.js') + combinedOptionalCaller));
+
+for (const [name, source, expected] of [
+  ['ordinary direct call', extraCaller, 1],
+  ['multiline ordinary call', "navigation.navigate(\n  'PlaceDetail',\n  place\n);", 1],
+  ['double-quoted ordinary call', 'navigation.navigate("PlaceDetail", place);', 1],
+  ['deep ordinary caller', "export const outer = (navigation, place) => () => { navigation.navigate('PlaceDetail', place); };", 1],
+  ['alias-object ordinary caller', "router.navigate('PlaceDetail', place);", 1],
+  ['same-line ordinary calls', "navigation.navigate('PlaceDetail', a); navigation.navigate('PlaceDetail', b);", 2],
+  ['ordinary and optional calls on one line', "navigation.navigate('PlaceDetail', a); navigation?.navigate('PlaceDetail', b);", 2],
+  ['two optional calls on one line', "navigation?.navigate('PlaceDetail', a); navigation.navigate?.('PlaceDetail', b);", 2],
+  ['comment false positive', "// navigation?.navigate('PlaceDetail', place)", 0],
+  ['string false positive', 'const example = "navigation?.navigate(\'PlaceDetail\')";', 0],
+  ['non-call optional member access', 'const fn = navigation?.navigate;', 0],
+  ['unrelated string constant', "const route = 'PlaceDetail';", 0],
+]) {
+  test(`caller AST form: ${name}`, () => {
+    assert.strictEqual(placeDetailCalls('src/components/Fixture.js', source).length, expected);
+  });
+}
 
 test('Home actionable records satisfy PlaceDetail', () => {
   const places = getHomeState({ auth: { mode: 'guest' }, userLocation: { latitude: 1, longitude: 1 }, nearbyPlaces: [valid] }).places;
