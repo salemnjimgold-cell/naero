@@ -114,6 +114,57 @@ function validateNavigationContract(source, flagDefaults = FLAG_DEFAULTS) {
 }
 
 const navigatorSource = read('src/navigation/AppNavigator.js');
+const SOURCE_EXTENSIONS = new Set(['.js']);
+const CALLER_CLASSIFICATION = Object.freeze({
+  'src/screens/HomeScreen.js': { role: 'REACHABLE_PRODUCTION', component: 'HomeScreen', calls: 1 },
+  'src/screens/DiscoverScreen.js': { role: 'REACHABLE_PRODUCTION', component: 'DiscoverScreen', calls: 1 },
+  'src/screens/ExploreScreen.js': { role: 'UNREACHABLE_LEGACY', component: 'ExploreScreen', calls: 1 },
+});
+
+function productionSourcePaths(directory = path.join(root, 'src')) {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...productionSourcePaths(absolute));
+    else if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
+      files.push(path.relative(root, absolute).replace(/\\/g, '/'));
+    }
+  }
+  return files.sort();
+}
+
+function productionSources() {
+  return new Map(productionSourcePaths().map((file) => [file, read(file)]));
+}
+
+function placeDetailCalls(file, source) {
+  const ast = parseSource(source);
+  const calls = [];
+  walk(ast, (node) => {
+    if (node.type !== 'CallExpression' || node.callee?.type !== 'MemberExpression') return;
+    const property = node.callee.computed ? node.callee.property?.value : node.callee.property?.name;
+    if (property !== 'navigate' || node.arguments[0]?.type !== 'StringLiteral' || node.arguments[0].value !== 'PlaceDetail') return;
+    calls.push({ file, line: node.loc.start.line, column: node.loc.start.column + 1 });
+  });
+  return calls;
+}
+
+function validateGlobalCallerContract(sources, graph) {
+  const discovered = [...sources.entries()].flatMap(([file, source]) => placeDetailCalls(file, source));
+  const byFile = new Map();
+  for (const call of discovered) byFile.set(call.file, [...(byFile.get(call.file) || []), call]);
+  assert.deepStrictEqual([...byFile.keys()].sort(), Object.keys(CALLER_CLASSIFICATION).sort());
+  const reachableComponents = new Set([...graph.legacy, ...graph.contextual].flatMap((route) => route.components));
+  for (const [file, classification] of Object.entries(CALLER_CLASSIFICATION)) {
+    const calls = byFile.get(file) || [];
+    assert.strictEqual(calls.length, classification.calls, `${file} PlaceDetail call count changed`);
+    if (classification.role === 'REACHABLE_PRODUCTION') assert(reachableComponents.has(classification.component), `${file} is not production reachable`);
+    else if (classification.role === 'UNREACHABLE_LEGACY') assert(!reachableComponents.has(classification.component), `${file} legacy caller became reachable`);
+    else assert.fail(`${file} has an unsupported caller classification`);
+  }
+  assert.strictEqual(discovered.length, 3);
+  return discovered;
+}
 
 test('production navigation graph keeps legacy discovery merged into World', () => {
   validateNavigationContract(navigatorSource);
@@ -121,16 +172,8 @@ test('production navigation graph keeps legacy discovery merged into World', () 
 
 test('reachable production PlaceDetail caller set is exactly Home and Discover', () => {
   const graph = validateNavigationContract(navigatorSource);
-  const reachableComponents = new Set([
-    ...graph.legacy,
-    ...graph.contextual,
-  ].flatMap((route) => route.components));
-  const screens = fs.readdirSync(path.join(root, 'src/screens')).filter((file) => file.endsWith('.js'));
-  const sourceCallers = screens.filter((file) => /navigate\(\s*['"]PlaceDetail['"]/.test(read(`src/screens/${file}`))).sort();
-  const reachableCallers = sourceCallers.filter((file) => reachableComponents.has(path.basename(file, '.js')));
-  assert.deepStrictEqual(sourceCallers, ['DiscoverScreen.js', 'ExploreScreen.js', 'HomeScreen.js']);
-  assert.deepStrictEqual(reachableCallers, ['DiscoverScreen.js', 'HomeScreen.js']);
-  assert(!reachableComponents.has('ExploreScreen'), 'legacy Explore became reachable without authorization');
+  const calls = validateGlobalCallerContract(productionSources(), graph);
+  assert.deepStrictEqual(calls.map((call) => call.file).sort(), Object.keys(CALLER_CLASSIFICATION).sort());
   assert(graph.stack.some((route) => route.name === 'PlaceDetail' && route.components.length === 1 && route.components[0] === 'PlaceDetailScreen'));
 });
 
@@ -179,6 +222,30 @@ mutationDetected('PlaceDetail removal', (source) => source.replace(/\s*<Stack\.S
 mutationDetected('PlaceDetail misbind', replace('name="PlaceDetail"\n          component={PlaceDetailScreen}', 'name="PlaceDetail"\n          component={ServiceDetailScreen}'));
 mutationDetected('PlaceDetail duplicate', replace(beforeStackClose, '        <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />\n' + beforeStackClose));
 mutationDetected('newNavigation default change', (source) => source, { ...FLAG_DEFAULTS, newNavigation: true });
+
+function callerMutationDetected(name, mutateSources) {
+  test(`hostile caller mutation detected: ${name}`, () => {
+    const sources = productionSources();
+    mutateSources(sources);
+    assert.throws(() => validateGlobalCallerContract(sources, validateNavigationContract(navigatorSource)));
+  });
+}
+
+const extraCaller = "export function hostileCaller(navigation, item) { navigation.navigate('PlaceDetail', { item }); }\n";
+callerMutationDetected('out-of-screens component caller', (sources) => sources.set('src/components/HostileCaller.js', extraCaller));
+callerMutationDetected('out-of-screens navigation caller', (sources) => sources.set('src/navigation/HostileCaller.js', extraCaller));
+callerMutationDetected('other production directory caller', (sources) => sources.set('src/services/HostileCaller.js', extraCaller));
+callerMutationDetected('new screens caller', (sources) => sources.set('src/screens/HostileCaller.js', extraCaller));
+for (const [name, file] of [
+  ['Home caller removal', 'src/screens/HomeScreen.js'],
+  ['Discover caller removal', 'src/screens/DiscoverScreen.js'],
+  ['Explore caller removal', 'src/screens/ExploreScreen.js'],
+]) {
+  callerMutationDetected(name, (sources) => sources.set(file, sources.get(file).replace("navigate('PlaceDetail'", "navigate('RemovedPlaceDetail'")));
+}
+callerMutationDetected('second Home caller', (sources) => sources.set('src/screens/HomeScreen.js', sources.get('src/screens/HomeScreen.js') + extraCaller));
+callerMutationDetected('second Discover caller', (sources) => sources.set('src/screens/DiscoverScreen.js', sources.get('src/screens/DiscoverScreen.js') + extraCaller));
+callerMutationDetected('unknown canonical caller', (sources) => sources.set('src/components/CanonicalHostileCaller.js', "export function hostileCaller(navigation, canonicalPlace) { navigation.navigate('PlaceDetail', { item: canonicalPlace }); }\n"));
 
 test('Home actionable records satisfy PlaceDetail', () => {
   const places = getHomeState({ auth: { mode: 'guest' }, userLocation: { latitude: 1, longitude: 1 }, nearbyPlaces: [valid] }).places;
