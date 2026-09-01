@@ -79,7 +79,7 @@ async function main() {
     assert.equal(writes.length, 0);
     release([{ latitude: 48.2, longitude: 16.37 }]);
     await pending;
-    assert(writes.some((entry) => entry.key === service.LOCATION_STORAGE_KEYS.state));
+    assert(writes.some((entry) => entry.key === service.LOCATION_STORAGE_KEYS.authority));
   });
   await test('empty resolver result fails closed', async () => {
     const { service, writes } = loadLocationService();
@@ -158,20 +158,20 @@ async function main() {
     let valid = true;
     const { service, values } = loadLocationService({ geocode: async () => valid ? [{ latitude: 48.2, longitude: 16.37 }] : [] });
     const first = await service.setManualLocation('Vienna');
-    const stored = values.get(service.LOCATION_STORAGE_KEYS.state);
+    const stored = values.get(service.LOCATION_STORAGE_KEYS.authority);
     valid = false;
     const failed = await service.setManualLocation('Invalid');
     assert.equal(failed.snapshot.address.city, first.snapshot.address.city);
-    assert.equal(values.get(service.LOCATION_STORAGE_KEYS.state), stored);
+    assert.equal(values.get(service.LOCATION_STORAGE_KEYS.authority), stored);
   });
   await test('previous valid state survives thrown resolver', async () => {
     let fail = false;
     const { service, values } = loadLocationService({ geocode: async () => { if (fail) throw new Error('offline'); return [{ latitude: 48.2, longitude: 16.37 }]; } });
     await service.setManualLocation('Vienna');
-    const stored = values.get(service.LOCATION_STORAGE_KEYS.state);
+    const stored = values.get(service.LOCATION_STORAGE_KEYS.authority);
     fail = true;
     await service.setManualLocation('Budapest');
-    assert.equal(values.get(service.LOCATION_STORAGE_KEYS.state), stored);
+    assert.equal(values.get(service.LOCATION_STORAGE_KEYS.authority), stored);
   });
   await test('first-time failure remains unresolved', async () => {
     const { service } = loadLocationService();
@@ -185,7 +185,7 @@ async function main() {
     const result = await service.initializeLocation();
     assert.equal(result.snapshot, null);
     assert.equal(values.get(legacy), 'NaeroInvalidCityZZQX987');
-    assert.equal(writes.length, 0);
+    assert.equal(writes.filter((entry) => entry.key === service.LOCATION_STORAGE_KEYS.authority).length, 1);
   });
   await test('legacy unresolved v2 manual snapshot is rejected', async () => {
     const stateKey = '@naero_location_state_v2';
@@ -215,7 +215,7 @@ async function main() {
     const olderResult = await older;
     assert.equal(newerResult.error, null);
     assert.equal(olderResult.error.code, 'STALE_CITY_SELECTION');
-    assert.equal(JSON.parse(values.get(service.LOCATION_STORAGE_KEYS.state)).address.city, 'Budapest');
+    assert.equal(JSON.parse(values.get(service.LOCATION_STORAGE_KEYS.authority)).snapshot.address.city, 'Budapest');
   });
   await test('duplicate pending submissions commit only the latest result', async () => {
     const releases = [];
@@ -226,7 +226,7 @@ async function main() {
     await second;
     releases[0]([{ latitude: 48.2, longitude: 16.37 }]);
     assert.equal((await first).error.code, 'STALE_CITY_SELECTION');
-    assert.equal(writes.filter((entry) => entry.key === service.LOCATION_STORAGE_KEYS.state).length, 1);
+    assert.equal(writes.filter((entry) => entry.key === service.LOCATION_STORAGE_KEYS.authority).length, 2, 'initial migration plus one authority commit');
   });
 
   await test('manual snapshot requires own finite bounded coordinates', async () => {

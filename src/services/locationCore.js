@@ -1,4 +1,5 @@
 const LOCATION_STATE_VERSION = 2;
+const LOCATION_AUTHORITY_VERSION = 3;
 const SIGNIFICANT_DISTANCE_METERS = 500;
 const SIGNIFICANT_ACCURACY_IMPROVEMENT_METERS = 100;
 const SIGNIFICANT_AGE_MS = 15 * 60 * 1000;
@@ -108,6 +109,51 @@ function normalizeStoredSnapshot(snapshot) {
   return null;
 }
 
+function normalizeLocationAuthority(authority) {
+  if (readOwn(authority, 'version') !== LOCATION_AUTHORITY_VERSION) return null;
+  const preference = readOwn(authority, 'preference');
+  if (!['auto', 'manual', 'off'].includes(preference)) return null;
+  const rawSnapshot = readOwn(authority, 'snapshot');
+  if (rawSnapshot !== null && !isFiniteNumber(readOwn(rawSnapshot, 'timestamp'))) return null;
+  const snapshot = rawSnapshot === null ? null : normalizeStoredSnapshot(rawSnapshot);
+  if (rawSnapshot !== null && !snapshot) return null;
+  if (preference === 'manual' && snapshot?.mode !== 'manual') return null;
+  if (preference === 'auto' && snapshot && snapshot.mode !== 'device') return null;
+  return {
+    version: LOCATION_AUTHORITY_VERSION,
+    preference,
+    snapshot,
+  };
+}
+
+function createLocationAuthority(preference, snapshot = null) {
+  return normalizeLocationAuthority({
+    version: LOCATION_AUTHORITY_VERSION,
+    preference,
+    snapshot,
+  });
+}
+
+function migrateV2LocationAuthority(input = {}) {
+  const preferencePresent = readOwn(input, 'preferencePresent') === true;
+  const preference = readOwn(input, 'preference');
+  const snapshotPresent = readOwn(input, 'snapshotPresent') === true;
+  const snapshot = readOwn(input, 'snapshot');
+  const validPreference = ['auto', 'manual', 'off'].includes(preference) ? preference : null;
+  const normalizedSnapshot = snapshotPresent ? normalizeStoredSnapshot(snapshot) : null;
+  if (validPreference === 'manual' && normalizedSnapshot?.mode === 'manual') {
+    return createLocationAuthority('manual', normalizedSnapshot);
+  }
+  if (validPreference === 'auto' && (!snapshotPresent || normalizedSnapshot?.mode === 'device')) {
+    return createLocationAuthority('auto', normalizedSnapshot);
+  }
+  if (validPreference === 'off') {
+    return createLocationAuthority('off', normalizedSnapshot);
+  }
+  if (!preferencePresent && !snapshotPresent) return createLocationAuthority('auto', null);
+  return createLocationAuthority('off', normalizedSnapshot);
+}
+
 function distanceMeters(first, second) {
   if (!first || !second) return Infinity;
   if (!isValidCoordinates(first.latitude, first.longitude)
@@ -144,6 +190,7 @@ function getDisplayCity(snapshot) {
 
 module.exports = {
   LOCATION_STATE_VERSION,
+  LOCATION_AUTHORITY_VERSION,
   SIGNIFICANT_DISTANCE_METERS,
   SIGNIFICANT_AGE_MS,
   isValidCoordinates,
@@ -152,6 +199,9 @@ module.exports = {
   createDeviceSnapshot,
   createManualSnapshot,
   normalizeStoredSnapshot,
+  normalizeLocationAuthority,
+  createLocationAuthority,
+  migrateV2LocationAuthority,
   distanceMeters,
   isSignificantLocationChange,
   getDisplayCity,

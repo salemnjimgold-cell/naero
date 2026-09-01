@@ -181,6 +181,9 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const engineInit = useRef(false);
   const cleanupRef = useRef(null);
+  const manualRequestCounterRef = useRef(0);
+  const latestManualRequestRef = useRef(0);
+  const activeManualRequestsRef = useRef(new Set());
 
   useEffect(() => {
     loadStoredData();
@@ -364,8 +367,19 @@ export function AppProvider({ children }) {
   }, []);
 
   const selectManualCity = useCallback(async (city) => {
+    const previousRequest = latestManualRequestRef.current;
+    const requestId = ++manualRequestCounterRef.current;
+    latestManualRequestRef.current = requestId;
+    activeManualRequestsRef.current.add(requestId);
     dispatch({ type: 'SET_LOCATION_LOADING', payload: true });
     const result = await setManualLocation(city);
+    activeManualRequestsRef.current.delete(requestId);
+    if (result.accepted === false) {
+      if (latestManualRequestRef.current === requestId) latestManualRequestRef.current = previousRequest;
+      if (activeManualRequestsRef.current.size === 0) dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
+      return result;
+    }
+    if (latestManualRequestRef.current !== requestId) return result;
     dispatch({ type: 'SET_LOCATION_STATE', payload: result });
     dispatch({ type: 'SET_LOCATION_LOADING', payload: false });
     return result;

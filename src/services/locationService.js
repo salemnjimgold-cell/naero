@@ -4,29 +4,48 @@ import { apiClient } from './apiClient';
 
 const {
   createDeviceSnapshot,
+  createLocationAuthority,
   createManualSnapshot,
   getDisplayCity,
   isSignificantLocationChange,
   isValidCoordinates,
-  normalizeStoredSnapshot,
+  migrateV2LocationAuthority,
+  normalizeLocationAuthority,
   normalizeAddress,
   readOwn,
 } = require('./locationCore');
 
 const STORAGE_KEY = '@naero_location_state_v2';
 const PREFERENCE_KEY = '@naero_location_preference_v2';
+const AUTHORITY_KEY = '@naero_location_authority_v3';
 const LEGACY_LOCATION_KEY = '@naero_last_location';
 const LEGACY_CITY_KEY = '@naero_manual_city';
 
 let cachedSnapshot = null;
 let cachedPreference = 'auto';
+let cachedAuthority = null;
+let authorityLoadPromise = null;
 let activeSubscription = null;
-let manualSelectionVersion = 0;
+let authorityIntentVersion = 0;
+let authorityWriteInFlight = false;
+const pendingManualIntents = new Set();
+
+function syncAuthorityCache(authority) {
+  cachedAuthority = authority;
+  cachedSnapshot = authority.snapshot;
+  cachedPreference = authority.preference;
+}
+
+function activeSnapshot(authority = cachedAuthority) {
+  return authority && authority.preference !== 'off' ? authority.snapshot : null;
+}
 
 function makeResult(overrides = {}) {
   return {
-    snapshot: cachedSnapshot,
-    preference: cachedPreference,
+    snapshot: activeSnapshot(),
+    preference: cachedAuthority?.preference || cachedPreference,
+    authority: cachedAuthority,
+    accepted: true,
     permissionStatus: 'undetermined',
     servicesEnabled: null,
     error: null,
@@ -34,60 +53,106 @@ function makeResult(overrides = {}) {
   };
 }
 
-async function persistSnapshot(snapshot) {
-  cachedSnapshot = snapshot;
-  if (snapshot) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-  } else {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+function parseJson(raw) {
+  try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+async function readOrMigrateAuthority() {
+  try {
+    const v3Raw = await AsyncStorage.getItem(AUTHORITY_KEY);
+    const v3 = normalizeLocationAuthority(parseJson(v3Raw));
+    if (v3) {
+      syncAuthorityCache(v3);
+      return v3;
+    }
+
+    const [snapshotRaw, preferenceRaw, legacyCity, legacyLocationRaw] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY),
+      AsyncStorage.getItem(PREFERENCE_KEY),
+      AsyncStorage.getItem(LEGACY_CITY_KEY),
+      AsyncStorage.getItem(LEGACY_LOCATION_KEY),
+    ]);
+    let snapshotPresent = Boolean(snapshotRaw);
+    let snapshot = parseJson(snapshotRaw);
+    let preferencePresent = preferenceRaw !== null;
+    let preference = preferenceRaw;
+    if (!snapshotPresent && !legacyCity && legacyLocationRaw) {
+      snapshotPresent = true;
+      snapshot = createDeviceSnapshot(parseJson(legacyLocationRaw), null);
+      if (!preferencePresent) {
+        preferencePresent = true;
+        preference = 'auto';
+      }
+    }
+    const migrated = migrateV2LocationAuthority({ preferencePresent, preference, snapshotPresent, snapshot });
+    await AsyncStorage.setItem(AUTHORITY_KEY, JSON.stringify(migrated));
+    syncAuthorityCache(migrated);
+    return migrated;
+  } catch {
+    return createLocationAuthority('off', null);
+  }
+}
+
+async function loadAuthority() {
+  if (cachedAuthority) return cachedAuthority;
+  if (!authorityLoadPromise) {
+    authorityLoadPromise = readOrMigrateAuthority().finally(() => {
+      authorityLoadPromise = null;
+    });
+  }
+  return authorityLoadPromise;
+}
+
+async function commitAuthority(candidate, options = {}) {
+  const intentVersion = options.intentVersion;
+  const eligibility = options.eligibility;
+  const previous = await loadAuthority();
+  const normalizedCandidate = normalizeLocationAuthority(candidate);
+  if (!normalizedCandidate) {
+    return makeResult({
+      snapshot: activeSnapshot(previous), preference: previous.preference, authority: previous,
+      accepted: false,
+      error: { code: 'INVALID_LOCATION_AUTHORITY', message: 'The location choice is invalid.' },
+    });
+  }
+  if (authorityWriteInFlight) {
+    return makeResult({
+      snapshot: activeSnapshot(previous),
+      preference: previous.preference,
+      authority: previous,
+      accepted: false,
+      error: { code: 'LOCATION_BUSY', message: 'Another location change is finishing. Try again.' },
+    });
+  }
+  if ((intentVersion !== undefined && intentVersion !== authorityIntentVersion) || (eligibility && !eligibility(previous))) {
+    return makeResult({
+      snapshot: activeSnapshot(previous), preference: previous.preference, authority: previous,
+      error: { code: 'STALE_LOCATION_INTENT', message: 'A newer location choice is being used.' },
+    });
+  }
+  authorityWriteInFlight = true;
+  try {
+    if ((intentVersion !== undefined && intentVersion !== authorityIntentVersion) || (eligibility && !eligibility(cachedAuthority || previous))) {
+      return makeResult({
+        snapshot: activeSnapshot(previous), preference: previous.preference, authority: previous,
+        error: { code: 'STALE_LOCATION_INTENT', message: 'A newer location choice is being used.' },
+      });
+    }
+    await AsyncStorage.setItem(AUTHORITY_KEY, JSON.stringify(normalizedCandidate));
+    syncAuthorityCache(normalizedCandidate);
+    return makeResult();
+  } catch {
+    return makeResult({
+      snapshot: activeSnapshot(previous), preference: previous.preference, authority: previous,
+      error: { code: 'LOCATION_PERSISTENCE_FAILED', message: 'The location choice could not be saved. Try again.' },
+    });
+  } finally {
+    authorityWriteInFlight = false;
   }
 }
 
 async function loadSnapshot() {
-  if (cachedSnapshot) return cachedSnapshot;
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = normalizeStoredSnapshot(JSON.parse(raw));
-      if (!parsed) return null;
-      cachedSnapshot = parsed;
-      return cachedSnapshot;
-    }
-
-    const [legacyCity, legacyLocationRaw] = await Promise.all([
-      AsyncStorage.getItem(LEGACY_CITY_KEY),
-      AsyncStorage.getItem(LEGACY_LOCATION_KEY),
-    ]);
-    if (legacyCity) {
-      // Legacy city-only state was never resolved and cannot be trusted as a location.
-      cachedSnapshot = null;
-    } else if (legacyLocationRaw) {
-      const legacyLocation = JSON.parse(legacyLocationRaw);
-      cachedSnapshot = createDeviceSnapshot(legacyLocation, null);
-    }
-    if (cachedSnapshot) {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cachedSnapshot));
-      await AsyncStorage.multiRemove([LEGACY_CITY_KEY, LEGACY_LOCATION_KEY]);
-    }
-    return cachedSnapshot;
-  } catch {
-    return null;
-  }
-}
-
-async function loadPreference() {
-  try {
-    const value = await AsyncStorage.getItem(PREFERENCE_KEY);
-    cachedPreference = ['auto', 'manual', 'off'].includes(value) ? value : 'auto';
-  } catch {
-    cachedPreference = 'auto';
-  }
-  return cachedPreference;
-}
-
-async function savePreference(preference) {
-  cachedPreference = preference;
-  await AsyncStorage.setItem(PREFERENCE_KEY, preference);
+  return (await loadAuthority()).snapshot;
 }
 
 export async function getLocationPermissionStatus() {
@@ -126,7 +191,7 @@ export async function reverseGeocodeLocation(latitude, longitude) {
   }
 }
 
-async function captureCurrentPosition({ force = false } = {}) {
+async function captureCurrentPosition({ force = false, intentVersion = authorityIntentVersion, automatic = false } = {}) {
   const servicesEnabled = await getLocationServicesEnabled();
   if (servicesEnabled === false) {
     return makeResult({
@@ -151,15 +216,18 @@ async function captureCurrentPosition({ force = false } = {}) {
       });
     }
 
-    const previous = await loadSnapshot();
-    if (force || isSignificantLocationChange(previous, next)) {
-      await persistSnapshot(next);
-    } else {
-      cachedSnapshot = { ...previous, address: address || previous.address };
+    const previous = await loadAuthority();
+    if (!force && !isSignificantLocationChange(previous.snapshot, next)) {
+      return makeResult({ permissionStatus: 'granted', servicesEnabled });
     }
-
-    await savePreference('auto');
-    return makeResult({ snapshot: cachedSnapshot, permissionStatus: 'granted', servicesEnabled });
+    if (automatic && pendingManualIntents.size > 0) {
+      return makeResult({ error: { code: 'STALE_LOCATION_INTENT', message: 'A newer location choice is being used.' }, permissionStatus: 'granted', servicesEnabled });
+    }
+    const result = await commitAuthority(createLocationAuthority('auto', next), {
+      intentVersion,
+      eligibility: (latest) => !automatic || (latest.preference === 'auto' && pendingManualIntents.size === 0),
+    });
+    return { ...result, permissionStatus: 'granted', servicesEnabled };
   } catch (error) {
     return makeResult({
       permissionStatus: 'granted',
@@ -173,27 +241,16 @@ async function captureCurrentPosition({ force = false } = {}) {
 }
 
 export async function initializeLocation() {
-  let preference = await loadPreference();
-  const [snapshot, permissionStatus, servicesEnabled] = await Promise.all([
-    loadSnapshot(),
+  const [authority, permissionStatus, servicesEnabled] = await Promise.all([
+    loadAuthority(),
     getLocationPermissionStatus(),
     getLocationServicesEnabled(),
   ]);
-  if (snapshot?.mode === 'manual' && preference === 'auto') {
-    await savePreference('manual');
-    preference = 'manual';
-  }
-
-  if (preference === 'off') {
-    return makeResult({ snapshot: null, preference, permissionStatus, servicesEnabled });
-  }
-  if (preference === 'manual' && snapshot?.mode === 'manual') {
-    return makeResult({ snapshot, preference, permissionStatus, servicesEnabled });
-  }
-  return makeResult({ snapshot, preference, permissionStatus, servicesEnabled });
+  return makeResult({ snapshot: activeSnapshot(authority), preference: authority.preference, authority, permissionStatus, servicesEnabled });
 }
 
 export async function requestForegroundLocation() {
+  const intentVersion = ++authorityIntentVersion;
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -203,7 +260,7 @@ export async function requestForegroundLocation() {
         error: { code: 'PERMISSION_DENIED', message: 'Foreground location permission was not granted.' },
       });
     }
-    return captureCurrentPosition({ force: true });
+    return captureCurrentPosition({ force: true, intentVersion });
   } catch (error) {
     return makeResult({
       permissionStatus: 'undetermined',
@@ -217,16 +274,16 @@ export async function requestForegroundLocation() {
 }
 
 export async function refreshLocationState() {
-  const preference = await loadPreference();
-  if (preference === 'off') {
+  const authority = await loadAuthority();
+  if (authority.preference === 'off') {
     return makeResult({
       snapshot: null,
-      preference,
+      preference: 'off',
       permissionStatus: await getLocationPermissionStatus(),
       servicesEnabled: await getLocationServicesEnabled(),
     });
   }
-  if (preference === 'manual') {
+  if (authority.preference === 'manual') {
     return initializeLocation();
   }
   const permissionStatus = await getLocationPermissionStatus();
@@ -237,13 +294,20 @@ export async function refreshLocationState() {
       error: { code: 'PERMISSION_DENIED', message: 'Foreground location permission is unavailable.' },
     });
   }
-  return captureCurrentPosition({ force: true });
+  const intentVersion = ++authorityIntentVersion;
+  return captureCurrentPosition({ force: true, intentVersion });
 }
 
 export async function setManualLocation(city) {
-  const selectionVersion = ++manualSelectionVersion;
+  if (authorityWriteInFlight) {
+    const previous = await loadAuthority();
+    return makeResult({ snapshot: activeSnapshot(previous), preference: previous.preference, authority: previous, accepted: false, error: { code: 'LOCATION_BUSY', message: 'Another location change is finishing. Try again.' } });
+  }
+  const selectionVersion = ++authorityIntentVersion;
+  pendingManualIntents.add(selectionVersion);
   const trimmedCity = typeof city === 'string' ? city.trim().replace(/\s+/g, ' ') : '';
   if (!trimmedCity) {
+    pendingManualIntents.delete(selectionVersion);
     return makeResult({
       permissionStatus: await getLocationPermissionStatus(),
       servicesEnabled: await getLocationServicesEnabled(),
@@ -267,58 +331,42 @@ export async function setManualLocation(city) {
     const resolvedCity = normalizeAddress(address).city || trimmedCity;
     const snapshot = createManualSnapshot(resolvedCity, { ...normalizeAddress(address), latitude, longitude });
     if (!snapshot) throw new Error('INVALID_RESOLVED_CITY');
-    if (selectionVersion !== manualSelectionVersion) {
+    if (selectionVersion !== authorityIntentVersion) {
       return makeResult({
         permissionStatus: await getLocationPermissionStatus(),
         servicesEnabled: await getLocationServicesEnabled(),
         error: { code: 'STALE_CITY_SELECTION', message: 'A newer city selection is already being used.' },
       });
     }
-    await persistSnapshot(snapshot);
-    await savePreference('manual');
-    return makeResult({
-      snapshot,
-      preference: 'manual',
-      permissionStatus: await getLocationPermissionStatus(),
-      servicesEnabled: await getLocationServicesEnabled(),
-    });
+    const result = await commitAuthority(createLocationAuthority('manual', snapshot), { intentVersion: selectionVersion });
+    return { ...result, permissionStatus: await getLocationPermissionStatus(), servicesEnabled: await getLocationServicesEnabled() };
   } catch {
     return makeResult({
       permissionStatus: await getLocationPermissionStatus(),
       servicesEnabled: await getLocationServicesEnabled(),
       error: { code: 'CITY_RESOLUTION_FAILED', message: 'City could not be found. Check the city name and try again.' },
     });
+  } finally {
+    pendingManualIntents.delete(selectionVersion);
   }
 }
 
 export async function disableLocationUse() {
   stopSignificantLocationUpdates();
-  await savePreference('off');
-  return makeResult({
-    snapshot: null,
-    preference: 'off',
-    permissionStatus: await getLocationPermissionStatus(),
-    servicesEnabled: await getLocationServicesEnabled(),
-  });
+  const intentVersion = ++authorityIntentVersion;
+  const current = await loadAuthority();
+  const result = await commitAuthority(createLocationAuthority('off', current.snapshot), { intentVersion });
+  return { ...result, permissionStatus: await getLocationPermissionStatus(), servicesEnabled: await getLocationServicesEnabled() };
 }
 
 export async function clearStoredLocationData() {
   stopSignificantLocationUpdates();
-  cachedSnapshot = null;
-  cachedPreference = 'off';
-  await AsyncStorage.multiRemove([
-    STORAGE_KEY,
-    PREFERENCE_KEY,
-    LEGACY_LOCATION_KEY,
-    LEGACY_CITY_KEY,
-  ]);
-  await AsyncStorage.setItem(PREFERENCE_KEY, 'off');
-  return makeResult({
-    snapshot: null,
-    preference: 'off',
-    permissionStatus: await getLocationPermissionStatus(),
-    servicesEnabled: await getLocationServicesEnabled(),
-  });
+  const intentVersion = ++authorityIntentVersion;
+  const result = await commitAuthority(createLocationAuthority('off', null), { intentVersion });
+  if (!result.error) {
+    AsyncStorage.multiRemove([STORAGE_KEY, PREFERENCE_KEY, LEGACY_LOCATION_KEY, LEGACY_CITY_KEY]).catch(() => {});
+  }
+  return { ...result, permissionStatus: await getLocationPermissionStatus(), servicesEnabled: await getLocationServicesEnabled() };
 }
 
 export async function startSignificantLocationUpdates(onChange) {
@@ -337,13 +385,12 @@ export async function startSignificantLocationUpdates(onChange) {
         const address = await reverseGeocodeLocation(position.coords.latitude, position.coords.longitude);
         const next = createDeviceSnapshot(position, address);
         if (!next || !isSignificantLocationChange(cachedSnapshot, next)) return;
-        await persistSnapshot(next);
-        onChange?.(makeResult({
-          snapshot: next,
-          preference: 'auto',
-          permissionStatus: 'granted',
-          servicesEnabled: true,
-        }));
+        if (pendingManualIntents.size > 0 || cachedAuthority?.preference !== 'auto') return;
+        const result = await commitAuthority(createLocationAuthority('auto', next), {
+          intentVersion: authorityIntentVersion,
+          eligibility: (latest) => latest.preference === 'auto' && pendingManualIntents.size === 0,
+        });
+        if (!result.error) onChange?.({ ...result, permissionStatus: 'granted', servicesEnabled: true });
       }
     );
   } catch {
@@ -407,6 +454,7 @@ export async function hasLocationPermission() {
 }
 
 export const LOCATION_STORAGE_KEYS = {
+  authority: AUTHORITY_KEY,
   state: STORAGE_KEY,
   preference: PREFERENCE_KEY,
 };
