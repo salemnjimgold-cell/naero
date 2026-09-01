@@ -7,6 +7,18 @@ function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function readOwn(object, key) {
+  if (!object || (typeof object !== 'object' && typeof object !== 'function')) return undefined;
+  try {
+    if (!Object.prototype.hasOwnProperty.call(object, key)) return undefined;
+    const descriptor = Object.getOwnPropertyDescriptor(object, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return undefined;
+    return descriptor.value;
+  } catch {
+    return undefined;
+  }
+}
+
 function isValidCoordinates(latitude, longitude) {
   return isFiniteNumber(latitude)
     && isFiniteNumber(longitude)
@@ -29,12 +41,12 @@ function normalizeCountryCode(value) {
 
 function normalizeAddress(address = {}) {
   return {
-    country: normalizeText(address.country),
-    countryCode: normalizeCountryCode(address.isoCountryCode || address.countryCode),
-    city: normalizeText(address.city || address.town || address.village),
-    district: normalizeText(address.district || address.cityDistrict),
-    region: normalizeText(address.region || address.subregion),
-    postalCode: normalizeText(address.postalCode || address.postcode),
+    country: normalizeText(readOwn(address, 'country')),
+    countryCode: normalizeCountryCode(readOwn(address, 'isoCountryCode') || readOwn(address, 'countryCode')),
+    city: normalizeText(readOwn(address, 'city') || readOwn(address, 'town') || readOwn(address, 'village')),
+    district: normalizeText(readOwn(address, 'district') || readOwn(address, 'cityDistrict')),
+    region: normalizeText(readOwn(address, 'region') || readOwn(address, 'subregion')),
+    postalCode: normalizeText(readOwn(address, 'postalCode') || readOwn(address, 'postcode')),
   };
 }
 
@@ -63,15 +75,15 @@ function createManualSnapshot(city, details = {}, capturedAt = Date.now()) {
   const normalizedCity = normalizeText(city);
   if (!normalizedCity) return null;
 
-  const latitude = details.latitude;
-  const longitude = details.longitude;
-  const hasCoordinates = isValidCoordinates(latitude, longitude);
+  const latitude = readOwn(details, 'latitude');
+  const longitude = readOwn(details, 'longitude');
+  if (!isValidCoordinates(latitude, longitude)) return null;
 
   return {
     version: LOCATION_STATE_VERSION,
     mode: 'manual',
-    latitude: hasCoordinates ? latitude : null,
-    longitude: hasCoordinates ? longitude : null,
+    latitude,
+    longitude,
     accuracy: null,
     timestamp: capturedAt,
     address: {
@@ -79,6 +91,21 @@ function createManualSnapshot(city, details = {}, capturedAt = Date.now()) {
       city: normalizedCity,
     },
   };
+}
+
+function normalizeStoredSnapshot(snapshot) {
+  const mode = readOwn(snapshot, 'mode');
+  const latitude = readOwn(snapshot, 'latitude');
+  const longitude = readOwn(snapshot, 'longitude');
+  const address = readOwn(snapshot, 'address');
+  if (mode === 'manual') {
+    const city = normalizeAddress(address).city;
+    return createManualSnapshot(city, { ...normalizeAddress(address), latitude, longitude }, readOwn(snapshot, 'timestamp'));
+  }
+  if (mode === 'device') {
+    return createDeviceSnapshot({ latitude, longitude, accuracy: readOwn(snapshot, 'accuracy'), timestamp: readOwn(snapshot, 'timestamp') }, address);
+  }
+  return null;
 }
 
 function distanceMeters(first, second) {
@@ -120,9 +147,11 @@ module.exports = {
   SIGNIFICANT_DISTANCE_METERS,
   SIGNIFICANT_AGE_MS,
   isValidCoordinates,
+  readOwn,
   normalizeAddress,
   createDeviceSnapshot,
   createManualSnapshot,
+  normalizeStoredSnapshot,
   distanceMeters,
   isSignificantLocationChange,
   getDisplayCity,

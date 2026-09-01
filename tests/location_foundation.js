@@ -67,11 +67,12 @@ test('creates a device snapshot with accuracy and provider timestamp', () => {
   assert.equal(snapshot.address.countryCode, 'HU');
 });
 
-test('manual mode remains usable without coordinates or country assumptions', () => {
-  const snapshot = createManualSnapshot('  Tunis  ');
+test('manual mode requires resolved coordinates without country assumptions', () => {
+  assert.equal(createManualSnapshot('  Tunis  '), null);
+  const snapshot = createManualSnapshot('  Tunis  ', { latitude: 36.8065, longitude: 10.1815 });
   assert.equal(snapshot.mode, 'manual');
-  assert.equal(snapshot.latitude, null);
-  assert.equal(snapshot.longitude, null);
+  assert.equal(snapshot.latitude, 36.8065);
+  assert.equal(snapshot.longitude, 10.1815);
   assert.equal(snapshot.address.city, 'Tunis');
   assert.equal(snapshot.address.country, null);
   assert.equal(getDisplayCity(snapshot), 'Tunis');

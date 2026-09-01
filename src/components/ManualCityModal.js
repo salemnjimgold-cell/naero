@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS, FONTS, SPACING, RADIUS } from '../theme';
 
 export function ManualCityModal({
@@ -18,6 +19,7 @@ export function ManualCityModal({
   onClose,
   onSave,
 }) {
+  const { t } = useTranslation();
   const [city, setCity] = useState(initialCity);
   const [error, setError] = useState(null);
 
@@ -31,12 +33,12 @@ export function ManualCityModal({
   const handleSave = async () => {
     const normalized = city.trim().replace(/\s+/g, ' ');
     if (!normalized) {
-      setError('Enter a city name.');
+      setError(t('gate1.manualCity.required'));
       return;
     }
     const result = await onSave(normalized);
     if (result?.error) {
-      setError(result.error.message || 'The city could not be saved.');
+      setError(t('gate1.manualCity.notFound'));
       return;
     }
     onClose();
@@ -48,10 +50,10 @@ export function ManualCityModal({
         <View style={styles.content}>
           <View style={styles.header}>
             <Ionicons name="location-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.title}>Choose your city</Text>
+            <Text style={styles.title}>{t('gate1.manualCity.title')}</Text>
           </View>
           <Text style={styles.description}>
-            Use a city manually when you prefer not to share GPS or when location is unavailable.
+            {t('gate1.manualCity.description')}
           </Text>
           <TextInput
             style={styles.input}
@@ -60,24 +62,25 @@ export function ManualCityModal({
               setCity(value);
               setError(null);
             }}
-            placeholder="City, country"
+            placeholder={t('gate1.manualCity.placeholder')}
             placeholderTextColor={COLORS.textTertiary}
             autoCapitalize="words"
             autoCorrect={false}
             editable={!loading}
             returnKeyType="done"
             onSubmitEditing={handleSave}
+            accessibilityLabel={t('gate1.manualCity.inputLabel')}
           />
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error && <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">{error}</Text>}
           <View style={styles.buttons}>
             <TouchableOpacity style={styles.cancel} onPress={onClose} disabled={loading}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('gate1.manualCity.cancel')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.save} onPress={handleSave} disabled={loading}>
+            <TouchableOpacity style={styles.save} onPress={handleSave} disabled={loading} accessibilityRole="button" accessibilityLabel={loading ? t('gate1.manualCity.resolving') : t('gate1.manualCity.submit')} accessibilityState={{ disabled: loading, busy: loading }}>
               {loading ? (
                 <ActivityIndicator size="small" color={COLORS.white} />
               ) : (
-                <Text style={styles.saveText}>Use this city</Text>
+                <Text style={styles.saveText}>{t('gate1.manualCity.submit')}</Text>
               )}
             </TouchableOpacity>
           </View>

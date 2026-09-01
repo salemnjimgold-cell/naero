@@ -8,7 +8,9 @@ const {
   getDisplayCity,
   isSignificantLocationChange,
   isValidCoordinates,
+  normalizeStoredSnapshot,
   normalizeAddress,
+  readOwn,
 } = require('./locationCore');
 
 const STORAGE_KEY = '@naero_location_state_v2';
@@ -19,6 +21,7 @@ const LEGACY_CITY_KEY = '@naero_manual_city';
 let cachedSnapshot = null;
 let cachedPreference = 'auto';
 let activeSubscription = null;
+let manualSelectionVersion = 0;
 
 function makeResult(overrides = {}) {
   return {
@@ -45,8 +48,8 @@ async function loadSnapshot() {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (!['device', 'manual'].includes(parsed?.mode)) return null;
+      const parsed = normalizeStoredSnapshot(JSON.parse(raw));
+      if (!parsed) return null;
       cachedSnapshot = parsed;
       return cachedSnapshot;
     }
@@ -56,7 +59,8 @@ async function loadSnapshot() {
       AsyncStorage.getItem(LEGACY_LOCATION_KEY),
     ]);
     if (legacyCity) {
-      cachedSnapshot = createManualSnapshot(legacyCity);
+      // Legacy city-only state was never resolved and cannot be trusted as a location.
+      cachedSnapshot = null;
     } else if (legacyLocationRaw) {
       const legacyLocation = JSON.parse(legacyLocationRaw);
       cachedSnapshot = createDeviceSnapshot(legacyLocation, null);
@@ -237,6 +241,7 @@ export async function refreshLocationState() {
 }
 
 export async function setManualLocation(city) {
+  const selectionVersion = ++manualSelectionVersion;
   const trimmedCity = typeof city === 'string' ? city.trim().replace(/\s+/g, ' ') : '';
   if (!trimmedCity) {
     return makeResult({
@@ -246,31 +251,44 @@ export async function setManualLocation(city) {
     });
   }
 
-  let details = {};
   try {
     const matches = await Location.geocodeAsync(trimmedCity);
     const first = Array.isArray(matches) ? matches[0] : null;
-    if (first && isValidCoordinates(first.latitude, first.longitude)) {
-      const address = await reverseGeocodeLocation(first.latitude, first.longitude);
-      details = {
-        ...address,
-        latitude: first.latitude,
-        longitude: first.longitude,
-      };
+    const latitude = readOwn(first, 'latitude');
+    const longitude = readOwn(first, 'longitude');
+    if (!isValidCoordinates(latitude, longitude)) {
+      return makeResult({
+        permissionStatus: await getLocationPermissionStatus(),
+        servicesEnabled: await getLocationServicesEnabled(),
+        error: { code: 'CITY_NOT_FOUND', message: 'City could not be found. Check the city name and try again.' },
+      });
     }
+    const address = await reverseGeocodeLocation(latitude, longitude);
+    const resolvedCity = normalizeAddress(address).city || trimmedCity;
+    const snapshot = createManualSnapshot(resolvedCity, { ...normalizeAddress(address), latitude, longitude });
+    if (!snapshot) throw new Error('INVALID_RESOLVED_CITY');
+    if (selectionVersion !== manualSelectionVersion) {
+      return makeResult({
+        permissionStatus: await getLocationPermissionStatus(),
+        servicesEnabled: await getLocationServicesEnabled(),
+        error: { code: 'STALE_CITY_SELECTION', message: 'A newer city selection is already being used.' },
+      });
+    }
+    await persistSnapshot(snapshot);
+    await savePreference('manual');
+    return makeResult({
+      snapshot,
+      preference: 'manual',
+      permissionStatus: await getLocationPermissionStatus(),
+      servicesEnabled: await getLocationServicesEnabled(),
+    });
   } catch {
-    // Manual mode remains usable when the geocoder is unavailable.
+    return makeResult({
+      permissionStatus: await getLocationPermissionStatus(),
+      servicesEnabled: await getLocationServicesEnabled(),
+      error: { code: 'CITY_RESOLUTION_FAILED', message: 'City could not be found. Check the city name and try again.' },
+    });
   }
-
-  const snapshot = createManualSnapshot(trimmedCity, details);
-  await persistSnapshot(snapshot);
-  await savePreference('manual');
-  return makeResult({
-    snapshot,
-    preference: 'manual',
-    permissionStatus: await getLocationPermissionStatus(),
-    servicesEnabled: await getLocationServicesEnabled(),
-  });
 }
 
 export async function disableLocationUse() {
